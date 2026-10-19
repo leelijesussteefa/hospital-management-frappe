@@ -9,7 +9,7 @@ You can install this app using the [bench](https://github.com/frappe/bench) CLI:
 ```bash
 cd $PATH_TO_YOUR_BENCH
 bench get-app $URL_OF_THIS_REPO --branch version-16
-bench install-app hopital_management
+bench install-app hospital_management
 ```
 
 ### Contributing
@@ -17,7 +17,7 @@ bench install-app hopital_management
 This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
 
 ```bash
-cd apps/hopital_management
+cd apps/hospital_management
 pre-commit install
 ```
 

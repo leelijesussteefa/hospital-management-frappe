@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarePlus | Patient Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0b0f19;
+            --bg-surface: #111827;
+            --bg-card: #1f293d;
+            --border: #2e3a52;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-surface);
+            padding: 16px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        .brand-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-nav {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .patient-tag {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .patient-tag span {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        .btn-logout {
+            background: #991b1b;
+            color: #fff;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: var(--danger);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: #0284c7;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 8px;
+        }
+
+        .btn-submit:hover {
+            background: #0369a1;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(46, 58, 82, 0.4);
+            color: var(--text-main);
+        }
+
+        .badge-status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .empty-placeholder {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <div class="brand-title">✚ CarePlus Patient Portal</div>
+        <div class="user-nav">
+            <div class="patient-tag">Patient: <span id="loggedPatientName">Loading...</span></div>
+            <button class="btn-logout" onclick="confirmAndLogout()">Logout</button>
+        </div>
+    </header>
+
+    <div class="dashboard-grid">
+        <aside class="sidebar-booking">
+            <div class="card">
+                <h2 class="card-title">Book Appointment</h2>
+                <form id="appointmentForm" onsubmit="handleAppointmentBooking(event)">
+                    <div class="form-group">
+                        <label>Doctor *</label>
+                        <select id="doctorSelect" class="form-control" required>
+                            <option value="">-- Choose Doctor --</option>
+                            {% if doctors %}
+                                {% for doc in doctors %}
+                                    <option value="{{ doc.name }}">{{ doc.doctor_name or doc.name }}{% if doc.department %} ({{ doc.department }}){% endif %}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date *</label>
+                        <input type="date" id="appointmentDate" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Preferred Time *</label>
+                        <input type="time" id="appointmentTime" class="form-control" value="10:00" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contact Phone</label>
+                        <input type="text" id="contactPhone" class="form-control" placeholder="+91-0000000000">
+                    </div>
+                    <div class="form-group">
+                        <label>Reason for Visit</label>
+                        <textarea id="reasonVisit" class="form-control" rows="3" placeholder="Fever, Routine checkup, etc."></textarea>
+                    </div>
+                    <button type="submit" class="btn-submit" id="bookSubmitBtn">Confirm Booking</button>
+                </form>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="card">
+                <h2 class="card-title">Your Appointments</h2>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Doctor</th>
+                                <th>Date & Time</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="appointmentsTableBody">
+                            <tr>
+                                <td colspan="4" class="empty-placeholder">Loading appointments...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Your Prescriptions</h2>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Doctor</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="prescriptionsTableBody">
+                            <tr>
+                                <td colspan="3" class="empty-placeholder">No prescriptions recorded.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ─────────────────────────────────────────────
+        // 1. Permanent Back & Backspace Trap
+        // ─────────────────────────────────────────────
+        function lockHistory() {
+            window.history.pushState({ page: "dashboard" }, "", window.location.href);
+        }
+        lockHistory();
+
+        window.addEventListener("popstate", function () {
+            lockHistory();
+            setTimeout(() => {
+                const confirmExit = confirm("Are you sure you want to log out?");
+                if (confirmExit) {
+                    executeLogout();
+                }
+            }, 50);
+        });
+
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Backspace" || e.keyCode === 8) {
+                const target = document.activeElement;
+                const isField = target && (
+                    target.tagName === "INPUT" || 
+                    target.tagName === "TEXTAREA" || 
+                    target.isContentEditable
+                );
+                if (!isField) {
+                    e.preventDefault();
+                    if (confirm("Are you sure you want to log out?")) {
+                        executeLogout();
+                    }
+                }
+            }
+        });
+
+        // ─────────────────────────────────────────────
+        // 2. Logout Handlers
+        // ─────────────────────────────────────────────
+        function confirmAndLogout() {
+            if (confirm("Are you sure you want to log out?")) {
+                executeLogout();
+            }
+        }
+
+        async function executeLogout() {
+            try {
+                await fetch("/api/method/hospital_management.api.logout", { method: "POST" });
+            } catch (err) {
+                console.error("Logout request error:", err);
+            }
+            window.location.replace("/frontend");
+        }
+
+        // ─────────────────────────────────────────────
+        // 3. Load Doctors List (Server + API Fallback)
+        // ─────────────────────────────────────────────
+        async function loadDoctorsList() {
+            const sel = document.getElementById("doctorSelect");
+            // ஏற்கனவே Jinja மூலம் டாக்டர்கள் லோட் ஆகிவிட்டால் API அழைக்க வேண்டியதில்லை
+            if (sel.options.length > 1) {
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/method/hospital_management.api.get_doctors_list");
+                const result = await res.json();
+                const doctors = result.message || [];
+                
+                sel.innerHTML = '<option value="">-- Choose Doctor --</option>';
+                doctors.forEach(doc => {
+                    const opt = document.createElement("option");
+                    opt.value = doc.name;
+                    const info = doc.specialization ? ` (${doc.specialization})` : '';
+                    opt.textContent = (doc.doctor_name || doc.name) + info;
+                    sel.appendChild(opt);
+                });
+            } catch (err) {
+                console.error("Failed to fetch doctors list via API", err);
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // 4. Load Dashboard Records
+        // ─────────────────────────────────────────────
+        async function loadPatientDashboard() {
+            try {
+                const res = await fetch("/api/method/hospital_management.api.get_patient_dashboard_data");
+                const result = await res.json();
+                const data = result.message;
+
+                if (!data || data.status === "not_found") {
+                    alert("No patient profile linked with this login account.");
+                    window.location.replace("/frontend");
+                    return;
+                }
+
+                document.getElementById("loggedPatientName").textContent = data.patient.patient_name || data.patient.name;
+                if (data.patient.phone) {
+                    document.getElementById("contactPhone").value = data.patient.phone;
+                }
+
+                const apptBody = document.getElementById("appointmentsTableBody");
+                if (data.appointments && data.appointments.length > 0) {
+                    apptBody.innerHTML = data.appointments.map(a => `
+                        <tr>
+                            <td><strong>${a.doctor || "—"}</strong></td>
+                            <td>${a.appointment_date || "—"} &nbsp;|&nbsp; ${a.appointment_time ? (a.appointment_time.length >= 8 ? a.appointment_time.slice(0,5) : a.appointment_time.slice(0,4)) : ""}</td>
+                            <td><span class="badge-status">${a.status || "Scheduled"}</span></td>
+                            <td>${a.reason_for_visit || "—"}</td>
+                        </tr>
+                    `).join("");
+                } else {
+                    apptBody.innerHTML = '<tr><td colspan="4" class="empty-placeholder">No appointments booked yet.</td></tr>';
+                }
+
+                const rxBody = document.getElementById("prescriptionsTableBody");
+                if (data.prescriptions && data.prescriptions.length > 0) {
+                    rxBody.innerHTML = data.prescriptions.map(p => `
+                        <tr>
+                            <td><strong>${p.name}</strong></td>
+                            <td>${p.doctor || "—"}</td>
+                            <td>${p.prescription_date || "—"}</td>
+                        </tr>
+                    `).join("");
+                } else {
+                    rxBody.innerHTML = '<tr><td colspan="3" class="empty-placeholder">No prescriptions recorded.</td></tr>';
+                }
+
+            } catch (err) {
+                console.error("Error loading dashboard data:", err);
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // 5. Book Appointment
+        // ─────────────────────────────────────────────
+        async function handleAppointmentBooking(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById("bookSubmitBtn");
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Booking...";
+
+            const payload = {
+                doctor: document.getElementById("doctorSelect").value,
+                appointment_date: document.getElementById("appointmentDate").value,
+                appointment_time: document.getElementById("appointmentTime").value,
+                reason_for_visit: document.getElementById("reasonVisit").value,
+                phone_number: document.getElementById("contactPhone").value
+            };
+
+            try {
+                const response = await fetch("/api/method/hospital_management.api.book_patient_appointment", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Frappe-CSRF-Token": getCsrfToken()
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const res = await response.json();
+                if (res.message && res.message.status === "success") {
+                    alert("Appointment booked successfully! ID: " + res.message.appointment);
+                    document.getElementById("reasonVisit").value = "";
+                    loadPatientDashboard();
+                } else {
+                    alert("Booking failed: " + (res.message || "Please check provided details."));
+                }
+            } catch (err) {
+                console.error("Booking error:", err);
+                alert("Server error occurred while booking.");
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Confirm Booking";
+            }
+        }
+
+        function getCsrfToken() {
+            return window.csrf_token || (typeof frappe !== "undefined" && frappe.csrf_token) || "";
+        }
+
+        loadDoctorsList();
+        loadPatientDashboard();
+    </script>
+</body>
+</html>

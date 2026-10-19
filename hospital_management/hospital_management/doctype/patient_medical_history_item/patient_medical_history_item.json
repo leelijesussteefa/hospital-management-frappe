@@ -1,0 +1,50 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-10-12 18:33:02.051052",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_qyck",
+  "medical_condition",
+  "diagnosis_date",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_qyck",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "medical_condition",
+   "fieldtype": "Data",
+   "label": "Medical Condition"
+  },
+  {
+   "fieldname": "diagnosis_date",
+   "fieldtype": "Date",
+   "label": "Diagnosis Date"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-12 18:37:07.010113",
+ "modified_by": "Administrator",
+ "module": "Hospital Management",
+ "name": "Patient Medical History Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

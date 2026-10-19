@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CarePlus | Hospital Management</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', Arial, sans-serif; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0d1b2a 0%, #1a1f3a 50%, #0d2137 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 980px;
+      min-height: 580px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: rgba(22, 27, 34, 0.95);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+      backdrop-filter: blur(20px);
+    }
+
+    .welcome {
+      background: linear-gradient(145deg, #087f8c 0%, #174ea6 60%, #1a1f5e 100%);
+      color: white;
+      padding: 55px 44px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 48px;
+    }
+    .logo span { color: #8ff3e7; }
+    .medical-icon { font-size: 64px; margin-bottom: 24px; }
+    .welcome h1 { font-size: 36px; line-height: 1.25; margin-bottom: 18px; font-weight: 800; }
+    .welcome p { color: rgba(255,255,255,0.7); line-height: 1.8; font-size: 14px; }
+
+    .features {
+      margin-top: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.75);
+    }
+
+    .login-section {
+      padding: 50px 44px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: #0d1117;
+    }
+
+    .login-section h2 {
+      color: #f1f5f9;
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 28px; }
+
+    .tabs {
+      display: flex;
+      background: #1c2330;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 28px;
+      border: 1px solid #30363d;
+    }
+    .tab {
+      flex: 1;
+      border: none;
+      padding: 12px 8px;
+      cursor: pointer;
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      background: transparent;
+      transition: all 0.25s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .tab.active {
+      background: linear-gradient(135deg, #087f8c, #174ea6);
+      color: white;
+    }
+
+    .form-group { margin-bottom: 18px; }
+    label {
+      display: block;
+      color: #94a3b8;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    input {
+      width: 100%;
+      padding: 13px 16px;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      outline: none;
+      font-size: 14px;
+      background: #161b22;
+      color: #e6edf3;
+    }
+    input:focus { border-color: #087f8c; }
+
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #087f8c, #174ea6);
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+    .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .message {
+      margin-top: 16px;
+      font-size: 13px;
+      text-align: center;
+      min-height: 22px;
+    }
+
+    .footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 11px;
+      color: #484f58;
+    }
+
+    @media (max-width: 700px) {
+      .container { grid-template-columns: 1fr; }
+      .welcome { padding: 32px 24px; }
+      .login-section { padding: 32px 24px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="welcome">
+      <div class="logo">✚ Care<span>Plus</span></div>
+      <div class="medical-icon">🏥</div>
+      <h1>Your Health,<br>Our Priority.</h1>
+      <p>Welcome to CarePlus Hospital Management System. Access your healthcare portal securely.</p>
+      <div class="features">
+        <div class="feature-item">📅 View & track appointments</div>
+        <div class="feature-item">💊 Access your prescriptions</div>
+        <div class="feature-item">📋 Review medical records</div>
+        <div class="feature-item">🩺 Doctor clinical dashboard</div>
+      </div>
+    </div>
+
+    <div class="login-section">
+      <h2 id="loginTitle">Welcome Back!</h2>
+      <p class="subtitle" id="loginSubtitle">Sign in to your patient account</p>
+
+      <div class="tabs">
+        <button class="tab active" id="patientTab" type="button" onclick="switchRole('patient')">
+          🧑 Patient
+        </button>
+        <button class="tab" id="doctorTab" type="button" onclick="switchRole('doctor')">
+          🩺 Doctor
+        </button>
+      </div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" placeholder="Enter your email" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Enter your password" required>
+        </div>
+        <button type="submit" class="login-btn" id="loginButton">
+          Sign In as Patient
+        </button>
+        <p class="message" id="message"></p>
+
+        <div style="margin-top:16px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;font-size:12px;color:#94a3b8;line-height:1.5;">
+          💡 <strong>Patient:</strong> <code>tharun@gmail.com</code> | <code>Patient@123</code><br>
+          💡 <strong>Doctor:</strong> <code>amali@gmail.com</code> | <code>Doctor@123</code>
+        </div>
+      </form>
+
+      <div class="footer">
+        © 2026 CarePlus Hospital Management System
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentRole = 'patient';
+
+    function switchRole(role) {
+      currentRole = role;
+      const isDoctor = role === 'doctor';
+      document.getElementById('patientTab').classList.toggle('active', !isDoctor);
+      document.getElementById('doctorTab').classList.toggle('active', isDoctor);
+      document.getElementById('loginTitle').textContent = isDoctor ? 'Doctor Login' : 'Welcome Back!';
+      document.getElementById('loginSubtitle').textContent = isDoctor
+        ? 'Sign in to your doctor account'
+        : 'Sign in to your patient account';
+      document.getElementById('loginButton').textContent = isDoctor
+        ? 'Sign In as Doctor'
+        : 'Sign In as Patient';
+      document.getElementById('message').textContent = '';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const usr = document.getElementById('email').value.trim();
+      const pwd = document.getElementById('password').value;
+      const msg = document.getElementById('message');
+      const btn = document.getElementById('loginButton');
+
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+      msg.textContent = '';
+
+      try {
+        const response = await fetch('/api/method/login', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json' 
+          },
+          body: JSON.stringify({ usr: usr, pwd: pwd })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.message === 'Logged In') {
+          msg.style.color = '#4ade80';
+          msg.textContent = '✅ Login successful! Redirecting…';
+
+          setTimeout(() => {
+            if (currentRole === 'doctor') {
+              window.location.href = '/doctor_dashboard';
+            } else {
+              window.location.href = '/patient_dashboard';
+            }
+          }, 300);
+        } else {
+          btn.disabled = false;
+          btn.textContent = currentRole === 'doctor' ? 'Sign In as Doctor' : 'Sign In as Patient';
+          msg.style.color = '#f87171';
+          msg.textContent = '❌ Invalid email or password.';
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = currentRole === 'doctor' ? 'Sign In as Doctor' : 'Sign In as Patient';
+        msg.style.color = '#f87171';
+        msg.textContent = '⚠️ Network error during login.';
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>

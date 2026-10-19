@@ -1,0 +1,72 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "field:department_name",
+ "creation": "2026-10-10 12:12:41.247472",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_pfbm",
+  "department_name",
+  "department_head",
+  "description",
+  "s_active"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_pfbm",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "department_name",
+   "fieldtype": "Data",
+   "label": "Department Name",
+   "unique": 1
+  },
+  {
+   "fieldname": "department_head",
+   "fieldtype": "Data",
+   "label": "Department Head"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "default": "0",
+   "fieldname": "s_active",
+   "fieldtype": "Check",
+   "label": "s Active"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-13 15:36:10.745343",
+ "modified_by": "Administrator",
+ "module": "Hospital Management",
+ "name": "Departments",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

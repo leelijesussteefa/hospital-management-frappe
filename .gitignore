@@ -53,3 +53,31 @@ jspm_packages/
 
 # Aider AI Chat
 .aider*
+
+# Security & Sensitive files
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
+*.p12
+*.token
+*.cookie*
+ -H
+*.secrets*
+*credentials*
+site_config.json
+
+# Logs & Database Dumps
+*.log
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+
+# Temporary & OS files
+*.bak
+*.tmp
+*~
+Thumbs.db
