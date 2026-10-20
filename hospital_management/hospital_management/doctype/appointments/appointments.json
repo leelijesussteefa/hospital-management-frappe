@@ -14,7 +14,9 @@
   "reason_for_visit",
   "status",
   "consultation_fee",
-  "phone_number"
+  "phone_number",
+  "reminder_sent",
+  "confirmation_sent"
  ],
  "fields": [
   {
@@ -63,6 +65,18 @@
    "fieldname": "phone_number",
    "fieldtype": "Phone",
    "label": "phone number"
+  },
+  {
+   "default": "0",
+   "fieldname": "reminder_sent",
+   "fieldtype": "Check",
+   "label": "Reminder Sent"
+  },
+  {
+   "default": "0",
+   "fieldname": "confirmation_sent",
+   "fieldtype": "Check",
+   "label": "Confirmation Sent"
   }
  ],
  "grid_page_length": 50,

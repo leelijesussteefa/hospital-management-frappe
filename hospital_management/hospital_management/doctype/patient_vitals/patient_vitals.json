@@ -1,0 +1,237 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:VIT-.#####",
+ "creation": "2026-10-20 15:15:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_meta",
+  "naming_series",
+  "patient",
+  "appointment",
+  "column_break_meta",
+  "recorded_by",
+  "recorded_date_time",
+  "section_break_vitals",
+  "bp_systolic",
+  "bp_diastolic",
+  "pulse_rate",
+  "spo2",
+  "temperature",
+  "column_break_anthropometry",
+  "weight_kg",
+  "height_cm",
+  "bmi",
+  "bmi_status",
+  "section_break_sugar",
+  "blood_sugar_fasting",
+  "blood_sugar_postprandial",
+  "blood_sugar_random",
+  "column_break_sugar",
+  "sugar_remarks",
+  "section_break_remarks",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_meta",
+   "fieldtype": "Section Break",
+   "label": "Record Information"
+  },
+  {
+   "default": "VIT-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "VIT-.#####"
+  },
+  {
+   "fieldname": "patient",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Patient",
+   "options": "Patient",
+   "reqd": 1
+  },
+  {
+   "fieldname": "appointment",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Appointment",
+   "options": "Appointments"
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "recorded_by",
+   "fieldtype": "Link",
+   "label": "Recorded By",
+   "options": "User"
+  },
+  {
+   "default": "Now",
+   "fieldname": "recorded_date_time",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Recorded Date Time"
+  },
+  {
+   "fieldname": "section_break_vitals",
+   "fieldtype": "Section Break",
+   "label": "Vital Signs"
+  },
+  {
+   "fieldname": "bp_systolic",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "BP Systolic (mmHg)"
+  },
+  {
+   "fieldname": "bp_diastolic",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "BP Diastolic (mmHg)"
+  },
+  {
+   "fieldname": "pulse_rate",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Pulse Rate (bpm)"
+  },
+  {
+   "fieldname": "spo2",
+   "fieldtype": "Float",
+   "label": "SpO2 (%)"
+  },
+  {
+   "fieldname": "temperature",
+   "fieldtype": "Float",
+   "label": "Temperature (\u00b0F)"
+  },
+  {
+   "fieldname": "column_break_anthropometry",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "weight_kg",
+   "fieldtype": "Float",
+   "label": "Weight (kg)"
+  },
+  {
+   "fieldname": "height_cm",
+   "fieldtype": "Float",
+   "label": "Height (cm)"
+  },
+  {
+   "fieldname": "bmi",
+   "fieldtype": "Float",
+   "label": "BMI",
+   "read_only": 1
+  },
+  {
+   "fieldname": "bmi_status",
+   "fieldtype": "Select",
+   "label": "BMI Status",
+   "options": "\nUnderweight\nNormal\nOverweight\nObese",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_sugar",
+   "fieldtype": "Section Break",
+   "label": "Blood Glucose Monitoring"
+  },
+  {
+   "fieldname": "blood_sugar_fasting",
+   "fieldtype": "Float",
+   "label": "Fasting Blood Sugar - FBS (mg/dL)"
+  },
+  {
+   "fieldname": "blood_sugar_postprandial",
+   "fieldtype": "Float",
+   "label": "Postprandial Blood Sugar - PPBS (mg/dL)"
+  },
+  {
+   "fieldname": "blood_sugar_random",
+   "fieldtype": "Float",
+   "label": "Random Blood Sugar - RBS (mg/dL)"
+  },
+  {
+   "fieldname": "column_break_sugar",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sugar_remarks",
+   "fieldtype": "Select",
+   "label": "Sugar Classification",
+   "options": "\nNormal\nPre-diabetic\nHigh / Diabetic"
+  },
+  {
+   "fieldname": "section_break_remarks",
+   "fieldtype": "Section Break",
+   "label": "Clinical Remarks"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-20 15:15:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hospital Management",
+ "name": "Patient Vitals",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Receptionist",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "doctor",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "All"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

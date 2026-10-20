@@ -8,70 +8,231 @@
  "engine": "InnoDB",
  "field_order": [
   "section_break_izc8",
+  "naming_series",
   "patient",
+  "doctor",
   "appointment",
+  "column_break_inv_details",
   "invoice_date",
+  "due_date",
+  "prescription",
+  "section_break_items",
+  "items",
+  "section_break_charges",
   "consultation_charges",
   "medicine_charges",
+  "subtotal",
+  "column_break_tax",
+  "discount_amount",
+  "tax_percentage",
+  "tax_amount",
+  "grand_total",
   "total_amount",
+  "section_break_payment",
   "payment_status",
-  "naming_series"
+  "paid_amount",
+  "outstanding_amount",
+  "column_break_paymethod",
+  "payment_method",
+  "transaction_reference",
+  "payment_date",
+  "section_break_remarks",
+  "remarks"
  ],
  "fields": [
   {
    "fieldname": "section_break_izc8",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Invoice Details"
+  },
+  {
+   "default": "INV-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "INV-.#####"
   },
   {
    "fieldname": "patient",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Patient",
-   "options": "Patient"
+   "options": "Patient",
+   "reqd": 1
+  },
+  {
+   "fieldname": "doctor",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Doctor",
+   "options": "Doctor"
   },
   {
    "fieldname": "appointment",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Appointments",
    "options": "Appointments"
   },
   {
+   "fieldname": "column_break_inv_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
    "fieldname": "invoice_date",
    "fieldtype": "Date",
+   "in_list_view": 1,
    "label": "Invoice Date"
   },
   {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "label": "Due Date"
+  },
+  {
+   "fieldname": "prescription",
+   "fieldtype": "Link",
+   "label": "Prescription",
+   "options": "Prescription"
+  },
+  {
+   "fieldname": "section_break_items",
+   "fieldtype": "Section Break",
+   "label": "Line Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Invoice Items",
+   "options": "Invoice Item"
+  },
+  {
+   "fieldname": "section_break_charges",
+   "fieldtype": "Section Break",
+   "label": "Charges & Summary"
+  },
+  {
+   "default": "0",
    "fieldname": "consultation_charges",
    "fieldtype": "Currency",
-   "label": "Consultation Charges"
+   "label": "Consultation Charges",
+   "read_only": 1
   },
   {
+   "default": "0",
    "fieldname": "medicine_charges",
    "fieldtype": "Currency",
-   "label": "Medicine Charges"
+   "label": "Medicine Charges",
+   "read_only": 1
   },
   {
+   "default": "0",
+   "fieldname": "subtotal",
+   "fieldtype": "Currency",
+   "label": "Subtotal",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_tax",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "discount_amount",
+   "fieldtype": "Currency",
+   "label": "Discount Amount"
+  },
+  {
+   "default": "0",
+   "fieldname": "tax_percentage",
+   "fieldtype": "Percent",
+   "label": "Tax Percentage"
+  },
+  {
+   "default": "0",
+   "fieldname": "tax_amount",
+   "fieldtype": "Currency",
+   "label": "Tax Amount",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "grand_total",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Grand Total",
+   "read_only": 1
+  },
+  {
+   "default": "0",
    "fieldname": "total_amount",
    "fieldtype": "Currency",
    "label": "Total Amount",
    "read_only": 1
   },
   {
+   "fieldname": "section_break_payment",
+   "fieldtype": "Section Break",
+   "label": "Payment Information"
+  },
+  {
+   "default": "Unpaid",
    "fieldname": "payment_status",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Payment Status",
    "options": "Unpaid\nPartially Paid\nPaid\nCancelled"
   },
   {
-   "fieldname": "naming_series",
+   "default": "0",
+   "fieldname": "paid_amount",
+   "fieldtype": "Currency",
+   "label": "Paid Amount"
+  },
+  {
+   "default": "0",
+   "fieldname": "outstanding_amount",
+   "fieldtype": "Currency",
+   "label": "Outstanding Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_paymethod",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Cash",
+   "fieldname": "payment_method",
    "fieldtype": "Select",
-   "label": "Naming Series",
-   "options": "INV-.#####"
+   "label": "Payment Method",
+   "options": "Cash\nCard\nUPI\nInsurance\nBank Transfer"
+  },
+  {
+   "fieldname": "transaction_reference",
+   "fieldtype": "Data",
+   "label": "Transaction Reference / ID"
+  },
+  {
+   "fieldname": "payment_date",
+   "fieldtype": "Date",
+   "label": "Payment Date"
+  },
+  {
+   "fieldname": "section_break_remarks",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks / Notes"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-13 18:53:58.373275",
+ "modified": "2026-10-20 11:30:00.000000",
  "modified_by": "Administrator",
  "module": "Hospital Management",
  "name": "Invoice",
@@ -89,6 +250,21 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Receptionist",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "doctor"
   }
  ],
  "row_format": "Dynamic",

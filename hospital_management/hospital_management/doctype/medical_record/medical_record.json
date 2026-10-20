@@ -64,13 +64,13 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Naming Series",
-   "options": "MR-.#####"
+   "options": "MED-.YYYY.-.#####"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-13 18:33:17.630069",
+ "modified": "2026-10-20 10:14:53.026538",
  "modified_by": "Administrator",
  "module": "Hospital Management",
  "name": "Medical Record",

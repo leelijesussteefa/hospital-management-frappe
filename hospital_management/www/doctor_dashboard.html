@@ -611,6 +611,12 @@
     <a class="nav-item" onclick="switchTab('profile',this)">
       <span class="icon">👤</span> My Profile
     </a>
+    <a class="nav-item" onclick="switchTab('billing',this)">
+      <span class="icon">💳</span> Billing & Invoices
+    </a>
+    <a class="nav-item" onclick="switchTab('vitals',this)">
+      <span class="icon">💓</span> Patient Vitals
+    </a>
   </nav>
   <div class="sidebar-footer">
     <button class="logout-btn" onclick="confirmAndLogout()">
@@ -737,7 +743,7 @@
           <div class="table-card">
             <table>
               <thead><tr>
-                <th>Date</th><th>Patient</th><th>Medicine</th><th>Dosage</th><th>Frequency</th>
+                <th>Date</th><th>Patient</th><th>Medicine</th><th>Dosage</th><th>Frequency</th><th style="text-align:right">Action</th>
               </tr></thead>
               <tbody id="rx-tbody"></tbody>
             </table>
@@ -777,13 +783,210 @@
         </div>
       </div>
 
+      <div class="tab-panel" id="panel-vitals">
+        <div class="section">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+            <div class="section-title"><span class="icon">💓</span> Patient Vital Signs & Blood Glucose Timeline</div>
+            <button class="btn-action" style="background:var(--indigo); color:#fff; padding:8px 16px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="openGenericVitalsModal()">+ Record Patient Vitals</button>
+          </div>
+          <div class="table-card">
+            <table>
+              <thead>
+                <tr>
+                  <th>Recorded At</th>
+                  <th>Patient</th>
+                  <th>BP (mmHg)</th>
+                  <th>Pulse</th>
+                  <th>Temp</th>
+                  <th>BMI & Status</th>
+                  <th>Blood Sugar (FBS / PPBS / RBS)</th>
+                  <th>Sugar Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="vitals-timeline-tbody">
+                <tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-dim);">Loading patient vitals records…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-billing">
+        <div class="section">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+            <div class="section-title"><span class="icon">💳</span> Consultation & Patient Invoices</div>
+            <a href="/billing" class="btn-action" style="background:var(--indigo); color:#fff; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600;">Open Receptionist & Billing Portal ↗</a>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
+            <div style="background:var(--surface2); padding:18px; border-radius:12px; border:1px solid var(--border);">
+              <div style="color:var(--text-dim); font-size:12px; text-transform:uppercase; font-weight:600;">Total Invoiced</div>
+              <div style="font-size:24px; font-weight:800; color:var(--text); margin-top:6px;" id="doctorBilledTotal">₹0.00</div>
+            </div>
+            <div style="background:var(--surface2); padding:18px; border-radius:12px; border:1px solid var(--border);">
+              <div style="color:var(--text-dim); font-size:12px; text-transform:uppercase; font-weight:600;">Total Invoices</div>
+              <div style="font-size:24px; font-weight:800; color:var(--text); margin-top:6px;" id="doctorInvoicesCount">0</div>
+            </div>
+          </div>
+          <div class="table-card">
+            <table>
+              <thead>
+                <tr>
+                  <th>Invoice ID</th>
+                  <th>Date</th>
+                  <th>Patient</th>
+                  <th>Grand Total</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="doctor-billing-tbody">
+                <tr><td colspan="6" style="text-align:center; padding:24px; color:var(--text-dim);">Loading billing records…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <!-- Patient Vitals Entry Modal -->
+  <div class="modal-overlay" id="vitalsModal" style="display:none; z-index:1100;">
+    <div class="modal-card" style="max-width:700px; max-height:92vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:16px;">
+        <h3 style="margin:0;"><span class="icon">💓</span> Record Patient Vitals <span id="vitalsModalPatient" style="color:var(--indigo); font-size:14px;"></span></h3>
+        <button type="button" class="btn-action" onclick="closeVitalsModal()" style="font-size:18px; padding:4px 8px; border:none; background:transparent; color:var(--text-dim); cursor:pointer;">✕</button>
+      </div>
+
+      <form id="vitalsForm" onsubmit="submitPatientVitals(event)">
+        <input type="hidden" id="vitalsPatientId">
+        <input type="hidden" id="vitalsAppointmentId">
+
+        <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); border-radius:8px; padding:10px 14px; margin-bottom:16px; font-size:12.5px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+          <div><strong>Patient:</strong> <span id="vitalsPatientNameDisp">—</span></div>
+          <div id="vitalsApptRef"><strong>Appointment Ref:</strong> <span id="vitalsApptDisp">—</span></div>
+        </div>
+
+        <!-- Vital Signs Grid -->
+        <div style="font-weight:700; font-size:13px; color:var(--text); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+          <span>🩺</span> Primary Vital Signs
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Blood Pressure (Systolic / Diastolic mmHg)</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="number" id="vitalsBpSys" class="form-control" placeholder="120" min="50" max="300" oninput="updateBpIndicator()">
+              <span style="color:var(--text-dim); font-weight:700;">/</span>
+              <input type="number" id="vitalsBpDia" class="form-control" placeholder="80" min="30" max="200" oninput="updateBpIndicator()">
+              <span id="vitalsBpBadge" style="font-size:11px; padding:4px 8px; border-radius:12px; font-weight:700; white-space:nowrap; display:none;"></span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Pulse Rate (bpm)</label>
+            <input type="number" id="vitalsPulse" class="form-control" placeholder="e.g. 72" min="30" max="250">
+          </div>
+
+          <div class="form-group" style="margin-bottom:0;">
+            <label>SpO2 Blood Oxygen (%)</label>
+            <input type="number" id="vitalsSpo2" class="form-control" placeholder="e.g. 98" min="50" max="100" step="0.1">
+          </div>
+
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Body Temperature (°F)</label>
+            <input type="number" id="vitalsTemp" class="form-control" placeholder="e.g. 98.6" min="90" max="110" step="0.1">
+          </div>
+        </div>
+
+        <!-- Anthropometry & Real-time BMI -->
+        <div style="font-weight:700; font-size:13px; color:var(--text); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+          <span>⚖️</span> Body Metrics & Real-Time BMI
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Weight (kg)</label>
+            <input type="number" id="vitalsWeight" class="form-control" placeholder="e.g. 70" min="1" max="300" step="0.1" oninput="calculateRealtimeBmi()">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Height (cm)</label>
+            <input type="number" id="vitalsHeight" class="form-control" placeholder="e.g. 175" min="30" max="250" step="0.1" oninput="calculateRealtimeBmi()">
+          </div>
+        </div>
+
+        <!-- Real-time BMI Result Display Banner -->
+        <div id="vitalsBmiBanner" style="display:none; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:16px; align-items:center; justify-content:space-between;">
+          <div style="font-size:13px;">
+            <span>Calculated BMI: <strong id="vitalsBmiVal" style="font-size:16px; color:var(--text);">22.5</strong></span>
+            <span style="font-size:11px; color:var(--text-dim); margin-left:8px;">(kg/m²)</span>
+          </div>
+          <span id="vitalsBmiBadge" style="font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">Normal</span>
+        </div>
+
+        <!-- Blood Glucose Monitoring -->
+        <div style="font-weight:700; font-size:13px; color:var(--text); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+          <span>🩸</span> Blood Glucose Monitoring (mg/dL)
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Fasting (FBS)</label>
+            <input type="number" id="vitalsFbs" class="form-control" placeholder="< 100 mg/dL" min="20" max="600" step="0.1" oninput="calculateRealtimeSugar()">
+            <span style="font-size:10px; color:var(--text-dim); margin-top:2px; display:block;">Normal: 70-99</span>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Postprandial (PPBS)</label>
+            <input type="number" id="vitalsPpbs" class="form-control" placeholder="< 140 mg/dL" min="20" max="600" step="0.1" oninput="calculateRealtimeSugar()">
+            <span style="font-size:10px; color:var(--text-dim); margin-top:2px; display:block;">Normal: < 140</span>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Random (RBS)</label>
+            <input type="number" id="vitalsRbs" class="form-control" placeholder="< 140 mg/dL" min="20" max="600" step="0.1" oninput="calculateRealtimeSugar()">
+            <span style="font-size:10px; color:var(--text-dim); margin-top:2px; display:block;">Normal: 70-139</span>
+          </div>
+        </div>
+
+        <!-- Real-time Sugar Banner -->
+        <div id="vitalsSugarBanner" style="display:none; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:16px; align-items:center; justify-content:space-between;">
+          <span style="font-size:12.5px;">Sugar Classification:</span>
+          <span id="vitalsSugarBadge" style="font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">Normal</span>
+        </div>
+
+        <!-- Remarks -->
+        <div class="form-group">
+          <label>Clinical Notes / Vitals Remarks</label>
+          <textarea id="vitalsRemarks" class="form-control" rows="2" placeholder="e.g. Patient rested 5 mins before BP. Normal hydration."></textarea>
+        </div>
+
+        <div class="modal-actions" style="margin-top:20px; border-top:1px solid var(--border); padding-top:14px;">
+          <button type="button" class="btn-close" onclick="closeVitalsModal()">Cancel</button>
+          <button type="submit" class="btn-action" id="vitalsSubmitBtn" style="background:var(--indigo); color:#fff; padding:10px 20px; font-weight:700; border-radius:6px; border:none; cursor:pointer;">💾 Save Vitals Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Doctor Invoice Slip Modal -->
+  <div class="modal-overlay" id="doctorSlipModal" style="display:none;">
+    <div class="modal-card" style="max-width:680px; max-height:90vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:16px;">
+        <h3 style="margin:0;">Invoice Slip <span id="doctorSlipId" style="color:var(--indigo);">—</span></h3>
+        <button class="btn-action" onclick="closeDoctorSlipModal()" style="font-size:18px; padding:4px 8px; border:none; background:transparent; color:var(--text-dim); cursor:pointer;">✕</button>
+      </div>
+      <div id="doctorSlipContent">
+        <div style="text-align:center; padding:24px; color:var(--text-dim);">Loading slip details...</div>
+      </div>
+      <div class="modal-actions" style="margin-top:20px; border-top:1px solid var(--border); padding-top:12px;">
+        <button type="button" class="btn-action" onclick="window.print()" style="background:var(--blue); color:#fff; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">🖨️ Print Slip</button>
+        <button type="button" class="btn-action btn-cancel" onclick="closeDoctorSlipModal()">Close</button>
+      </div>
     </div>
   </div>
 </main>
 
 <div class="modal-overlay" id="rxModal">
-  <div class="modal-card">
+  <div class="modal-card" style="max-width:650px;">
     <h3>Write Prescription <span id="rxModalPatient">Patient: —</span></h3>
+    <!-- Patient Latest Vitals & Blood Sugar Consultation Card -->
+    <div id="rxVitalsPreviewCard" style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:16px;"></div>
     <form id="rxForm" onsubmit="submitPrescription(event)">
       <input type="hidden" id="rxPatientId">
       <input type="hidden" id="rxAppointmentId">
@@ -808,6 +1011,11 @@
           <option value="Thrice Daily">Thrice Daily</option>
           <option value="As Needed" selected>As Needed</option>
         </select>
+      </div>
+
+      <div class="form-group">
+        <label>Quantity *</label>
+        <input type="number" id="rxQuantity" class="form-control" value="1" min="1" step="1" required>
       </div>
 
       <div class="form-group">
@@ -886,9 +1094,13 @@
       }
       globalDoctorData = d;
       render(d);
+      await loadDoctorBilling(d.doctor);
     } catch (err) {
       showError('Could not load your dashboard. Please refresh.');
       console.error(err);
+      if ($('doctor-billing-tbody')) {
+        $('doctor-billing-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--rose);">⚠️ Error loading billing records.</td></tr>';
+      }
     }
   }
 
@@ -974,8 +1186,13 @@
           <td>${fmt(r.medicine)}</td>
           <td>${fmt(r.dosage)}</td>
           <td>${fmt(r.frequency)}</td>
+          <td style="text-align:right">
+            <a href="/prescription_slip?name=${r.name}" target="_blank" class="btn-action" style="color:var(--blue); text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+              🖨️ Print / PDF
+            </a>
+          </td>
         </tr>`).join('')
-      : emptyRow(5, 'No prescriptions found');
+      : emptyRow(6, 'No prescriptions found');
 
     const recs = data.medical_records || [];
     $('rec-count').textContent = recs.length;
@@ -1024,7 +1241,8 @@
     } else if (appt.status === 'Confirmed') {
       btns += `<button class="btn-action btn-complete" onclick="updateStatus('${appt.name}', 'Completed')">Complete</button>`;
     }
-    btns += `<button class="btn-action btn-prescribe" onclick="openRxModal('${appt.patient}', '${appt.name}')">+ Rx</button>`;
+    btns += `<button class="btn-action" style="background:rgba(236,72,153,0.15); color:#f472b6; border:1px solid rgba(236,72,153,0.3);" onclick="openVitalsModal('${escapeHtml(appt.patient)}', '${escapeHtml(appt.name)}')" title="Record Vital Signs & Blood Glucose">💓 Vitals</button>`;
+    btns += `<button class="btn-action btn-prescribe" onclick="openRxModal('${escapeHtml(appt.patient)}', '${escapeHtml(appt.name)}')">+ Rx</button>`;
     return btns;
   }
 
@@ -1050,8 +1268,10 @@
 
   function openRxModal(patientId, appointmentId) {
     $('rxPatientId').value = patientId;
-    $('rxAppointmentId').value = appointmentId || '';$('rxModalPatient').textContent = 'Patient: ' + patientId;
+    $('rxAppointmentId').value = appointmentId || '';
+    $('rxModalPatient').textContent = 'Patient: ' + patientId;
     $('rxModal').style.display = 'flex';
+    loadRxVitalsPreview(patientId, appointmentId);
   }
 
   function closeRxModal() {
@@ -1071,6 +1291,7 @@
       medicine: $('rxMedicine').value,
       dosage: $('rxDosage').value,
       frequency: $('rxFrequency').value,
+      quantity: parseFloat($('rxQuantity').value) || 1,
       instructions: $('rxInstructions').value
     };
 
@@ -1084,9 +1305,12 @@
       });
       const data = await res.json();
       if (data.message && data.message.status === 'success') {
-        alert('Prescription added successfully!');
         closeRxModal();
         loadDoctorDashboard();
+        const rxDocName = (data.message.data && data.message.data.name) || '';
+        if (confirm('✅ Prescription recorded and added to billing!\n\nWould you like to view/print the official Medical Prescription slip now?')) {
+          window.open('/prescription_slip?name=' + rxDocName, '_blank');
+        }
       } else {
         alert('Failed to save prescription: ' + ((data.message && data.message.message) || 'Check input details.'));
       }
@@ -1121,6 +1345,498 @@
     document.querySelectorAll('.tab-btn, .nav-item').forEach(b => b.classList.remove('active'));
     document.getElementById('panel-' + tab).classList.add('active');
     if (btn) btn.classList.add('active');
+    if (tab === 'billing' && globalDoctorData) {
+      loadDoctorBilling(globalDoctorData.doctor);
+    }
+    if (tab === 'vitals') {
+      loadVitalsTimeline();
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Vitals & Blood Sugar Management Handlers
+  // ─────────────────────────────────────────────
+  function openVitalsModal(patientId, appointmentId) {
+    $('vitalsPatientId').value = patientId || '';
+    $('vitalsAppointmentId').value = appointmentId || '';
+    $('vitalsPatientNameDisp').textContent = patientId || 'Select Patient';
+    $('vitalsApptDisp').textContent = appointmentId || 'Walk-in / Direct';
+    $('vitalsModalPatient').textContent = patientId ? 'Patient: ' + patientId : '';
+    $('vitalsForm').reset();
+    $('vitalsBpBadge').style.display = 'none';
+    $('vitalsBmiBanner').style.display = 'none';
+    $('vitalsSugarBanner').style.display = 'none';
+    $('vitalsModal').style.display = 'flex';
+  }
+
+  function openGenericVitalsModal() {
+    const pat = prompt('Enter Patient ID or Name:');
+    if (!pat) return;
+    openVitalsModal(pat.trim(), '');
+  }
+
+  function closeVitalsModal() {
+    $('vitalsModal').style.display = 'none';
+    $('vitalsForm').reset();
+  }
+
+  function calculateRealtimeBmi() {
+    const w = parseFloat($('vitalsWeight').value);
+    const h = parseFloat($('vitalsHeight').value);
+    const banner = $('vitalsBmiBanner');
+    const valEl = $('vitalsBmiVal');
+    const badge = $('vitalsBmiBadge');
+
+    if (w > 0 && h > 0) {
+      const hm = h / 100.0;
+      const bmi = (w / (hm * hm)).toFixed(1);
+      valEl.textContent = bmi;
+      banner.style.display = 'flex';
+
+      if (bmi < 18.5) {
+        badge.textContent = 'Underweight';
+        badge.style.background = 'rgba(56, 189, 248, 0.2)';
+        badge.style.color = '#38bdf8';
+      } else if (bmi < 25.0) {
+        badge.textContent = 'Normal Weight';
+        badge.style.background = 'rgba(74, 222, 128, 0.2)';
+        badge.style.color = '#4ade80';
+      } else if (bmi < 30.0) {
+        badge.textContent = 'Overweight';
+        badge.style.background = 'rgba(251, 191, 36, 0.2)';
+        badge.style.color = '#fbbf24';
+      } else {
+        badge.textContent = 'Obese';
+        badge.style.background = 'rgba(244, 63, 94, 0.2)';
+        badge.style.color = '#f43f5e';
+      }
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
+  function calculateRealtimeSugar() {
+    const fbs = parseFloat($('vitalsFbs').value);
+    const ppbs = parseFloat($('vitalsPpbs').value);
+    const rbs = parseFloat($('vitalsRbs').value);
+    const banner = $('vitalsSugarBanner');
+    const badge = $('vitalsSugarBadge');
+
+    let isHigh = false;
+    let isPre = false;
+    let hasVal = false;
+
+    if (!isNaN(fbs) && fbs > 0) {
+      hasVal = true;
+      if (fbs >= 126) isHigh = true;
+      else if (fbs >= 100) isPre = true;
+    }
+    if (!isNaN(ppbs) && ppbs > 0) {
+      hasVal = true;
+      if (ppbs >= 200) isHigh = true;
+      else if (ppbs >= 140) isPre = true;
+    }
+    if (!isNaN(rbs) && rbs > 0) {
+      hasVal = true;
+      if (rbs >= 200) isHigh = true;
+      else if (rbs >= 140) isPre = true;
+    }
+
+    if (hasVal) {
+      banner.style.display = 'flex';
+      if (isHigh) {
+        badge.textContent = 'High / Diabetic';
+        badge.style.background = 'rgba(244, 63, 94, 0.2)';
+        badge.style.color = '#f43f5e';
+      } else if (isPre) {
+        badge.textContent = 'Pre-diabetic';
+        badge.style.background = 'rgba(251, 191, 36, 0.2)';
+        badge.style.color = '#fbbf24';
+      } else {
+        badge.textContent = 'Normal';
+        badge.style.background = 'rgba(74, 222, 128, 0.2)';
+        badge.style.color = '#4ade80';
+      }
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
+  function updateBpIndicator() {
+    const sys = parseInt($('vitalsBpSys').value);
+    const dia = parseInt($('vitalsBpDia').value);
+    const badge = $('vitalsBpBadge');
+
+    if (!isNaN(sys) && !isNaN(dia) && sys > 0 && dia > 0) {
+      badge.style.display = 'inline-block';
+      if (sys < 120 && dia < 80) {
+        badge.textContent = 'Optimal BP';
+        badge.style.background = 'rgba(74, 222, 128, 0.2)';
+        badge.style.color = '#4ade80';
+      } else if (sys <= 129 && dia < 80) {
+        badge.textContent = 'Elevated';
+        badge.style.background = 'rgba(251, 191, 36, 0.2)';
+        badge.style.color = '#fbbf24';
+      } else if (sys <= 139 || dia <= 89) {
+        badge.textContent = 'Stage 1 HTN';
+        badge.style.background = 'rgba(249, 115, 22, 0.2)';
+        badge.style.color = '#f97316';
+      } else {
+        badge.textContent = 'Stage 2 HTN';
+        badge.style.background = 'rgba(244, 63, 94, 0.2)';
+        badge.style.color = '#f43f5e';
+      }
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  async function submitPatientVitals(e) {
+    e.preventDefault();
+    const btn = $('vitalsSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    const payload = {
+      patient: $('vitalsPatientId').value,
+      appointment: $('vitalsAppointmentId').value || null,
+      bp_systolic: $('vitalsBpSys').value || null,
+      bp_diastolic: $('vitalsBpDia').value || null,
+      pulse_rate: $('vitalsPulse').value || null,
+      spo2: $('vitalsSpo2').value || null,
+      temperature: $('vitalsTemp').value || null,
+      weight_kg: $('vitalsWeight').value || null,
+      height_cm: $('vitalsHeight').value || null,
+      blood_sugar_fasting: $('vitalsFbs').value || null,
+      blood_sugar_postprandial: $('vitalsPpbs').value || null,
+      blood_sugar_random: $('vitalsRbs').value || null,
+      remarks: $('vitalsRemarks').value
+    };
+
+    try {
+      const res = await fetch('/api/method/hospital_management.api.record_patient_vitals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.message && data.message.status === 'success') {
+        alert('✅ Vitals recorded successfully! Doc: ' + data.message.vitals.name);
+        closeVitalsModal();
+        if ($('rxModal').style.display === 'flex') {
+          loadRxVitalsPreview(payload.patient, payload.appointment);
+        }
+        loadVitalsTimeline();
+      } else {
+        alert('Failed to record vitals: ' + ((data.message && data.message.message) || 'Error'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error while saving vitals.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '💾 Save Vitals Record';
+    }
+  }
+
+  async function loadRxVitalsPreview(patientId, appointmentId) {
+    const card = $('rxVitalsPreviewCard');
+    if (!card) return;
+    card.innerHTML = '<div style="font-size:12px; color:var(--text-dim); text-align:center;">Loading latest patient vitals…</div>';
+
+    try {
+      const res = await fetch(`/api/method/hospital_management.api.get_latest_patient_vitals?patient=${encodeURIComponent(patientId)}`);
+      const data = await res.json();
+      const v = data.message && data.message.vitals;
+
+      if (v) {
+        const bp = (v.bp_systolic && v.bp_diastolic) ? `${v.bp_systolic}/${v.bp_diastolic} mmHg` : '—';
+        const pulse = v.pulse_rate ? `${v.pulse_rate} bpm` : '—';
+        const temp = v.temperature ? `${v.temperature} °F` : '—';
+        const spo2 = v.spo2 ? `${v.spo2}%` : '—';
+        const bmi = v.bmi ? `${v.bmi} (${v.bmi_status || 'Normal'})` : '—';
+
+        const sugars = [];
+        if (v.blood_sugar_fasting) sugars.push(`FBS: ${v.blood_sugar_fasting} mg/dL`);
+        if (v.blood_sugar_postprandial) sugars.push(`PPBS: ${v.blood_sugar_postprandial} mg/dL`);
+        if (v.blood_sugar_random) sugars.push(`RBS: ${v.blood_sugar_random} mg/dL`);
+        const sugarDisplay = sugars.length > 0 ? sugars.join(' | ') : 'Not tested';
+
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px dashed var(--border); padding-bottom:6px;">
+            <div style="font-size:12px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:6px;">
+              <span>🩺</span> Latest Patient Vitals & Blood Glucose
+            </div>
+            <button type="button" class="btn-action" style="font-size:11px; padding:3px 8px; background:rgba(99,102,241,0.2); color:#a5b4fc; cursor:pointer;" onclick="openVitalsModal('${escapeHtml(patientId)}', '${escapeHtml(appointmentId || '')}')">
+              ✏️ Update Vitals
+            </button>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:8px; font-size:12px; margin-bottom:8px;">
+            <div><span style="color:var(--text-dim);">BP:</span> <strong style="color:var(--text);">${bp}</strong></div>
+            <div><span style="color:var(--text-dim);">Pulse:</span> <strong style="color:var(--text);">${pulse}</strong></div>
+            <div><span style="color:var(--text-dim);">SpO2:</span> <strong style="color:var(--text);">${spo2}</strong></div>
+            <div><span style="color:var(--text-dim);">Temp:</span> <strong style="color:var(--text);">${temp}</strong></div>
+            <div><span style="color:var(--text-dim);">BMI:</span> <strong style="color:var(--text);">${bmi}</strong></div>
+          </div>
+          <div style="font-size:12px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:space-between; align-items:center;">
+            <div><span style="color:var(--text-dim);">Blood Sugar:</span> <strong style="color:#f472b6;">🩸 ${sugarDisplay}</strong></div>
+            ${v.sugar_remarks ? `<span style="font-size:11px; padding:2px 8px; border-radius:12px; font-weight:700; background:${v.sugar_remarks === 'High / Diabetic' ? 'rgba(244,63,94,0.2)' : (v.sugar_remarks === 'Pre-diabetic' ? 'rgba(251,191,36,0.2)' : 'rgba(74,222,128,0.2)')}; color:${v.sugar_remarks === 'High / Diabetic' ? '#f43f5e' : (v.sugar_remarks === 'Pre-diabetic' ? '#fbbf24' : '#4ade80')}">${v.sugar_remarks}</span>` : ''}
+          </div>
+        `;
+      } else {
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px;">
+            <span style="color:var(--text-dim);">No vital signs recorded for this patient yet.</span>
+            <button type="button" class="btn-action" style="font-size:11px; padding:4px 10px; background:var(--indigo); color:#fff; cursor:pointer;" onclick="openVitalsModal('${escapeHtml(patientId)}', '${escapeHtml(appointmentId || '')}')">
+              💓 Record Vitals Now
+            </button>
+          </div>
+        `;
+      }
+    } catch (err) {
+      console.error(err);
+      card.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Could not fetch vitals preview.</div>';
+    }
+  }
+
+  async function loadVitalsTimeline() {
+    const tbody = $('vitals-timeline-tbody');
+    if (!tbody) return;
+
+    try {
+      const res = await fetch('/api/method/hospital_management.api.get_patient_vitals_history');
+      const data = await res.json();
+      const list = (data.message && data.message.vitals) || [];
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-dim);">No patient vitals recorded yet. Use "+ Record Patient Vitals" above or the 💓 button in appointments.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map(v => {
+        const bp = (v.bp_systolic && v.bp_diastolic) ? `${v.bp_systolic}/${v.bp_diastolic}` : '—';
+        const sugars = [];
+        if (v.blood_sugar_fasting) sugars.push(`FBS:${v.blood_sugar_fasting}`);
+        if (v.blood_sugar_postprandial) sugars.push(`PPBS:${v.blood_sugar_postprandial}`);
+        if (v.blood_sugar_random) sugars.push(`RBS:${v.blood_sugar_random}`);
+        const sugarStr = sugars.length > 0 ? sugars.join(' | ') : '—';
+
+        let sugarBadge = '—';
+        if (v.sugar_remarks) {
+          const sCol = v.sugar_remarks === 'High / Diabetic' ? '#f43f5e' : (v.sugar_remarks === 'Pre-diabetic' ? '#fbbf24' : '#4ade80');
+          const sBg = v.sugar_remarks === 'High / Diabetic' ? 'rgba(244,63,94,0.15)' : (v.sugar_remarks === 'Pre-diabetic' ? 'rgba(251,191,36,0.15)' : 'rgba(74,222,128,0.15)');
+          sugarBadge = `<span style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px; background:${sBg}; color:${sCol};">${v.sugar_remarks}</span>`;
+        }
+
+        return `<tr>
+          <td>${v.recorded_date_time ? new Date(v.recorded_date_time).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '—'}</td>
+          <td><strong>${escapeHtml(v.patient)}</strong></td>
+          <td>${bp}</td>
+          <td>${v.pulse_rate ? v.pulse_rate + ' bpm' : '—'}</td>
+          <td>${v.temperature ? v.temperature + ' °F' : '—'}</td>
+          <td>${v.bmi ? `<strong>${v.bmi}</strong> <span style="font-size:11px; color:var(--text-dim);">(${v.bmi_status})</span>` : '—'}</td>
+          <td style="color:#f472b6; font-weight:500;">${sugarStr}</td>
+          <td>${sugarBadge}</td>
+          <td>
+            <button class="btn-action" style="font-size:11px; padding:3px 8px;" onclick="openVitalsModal('${escapeHtml(v.patient)}', '${escapeHtml(v.appointment || '')}')">✏️ Edit / New</button>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch (err) {
+      console.error(err);
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--rose);">Failed to load vitals timeline.</td></tr>';
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Consultation Invoices & Billing Function
+  // ─────────────────────────────────────────────
+  async function loadDoctorBilling(doctor) {
+    const tbody = $('doctor-billing-tbody');
+    if (!tbody) return;
+
+    try {
+      const docObj = doctor || (globalDoctorData && globalDoctorData.doctor);
+      const docIdentifier = (docObj && (docObj.name || docObj.doctor_name || docObj.email)) || '';
+      let url = '/api/method/hospital_management.api.get_invoices';
+      if (docIdentifier) {
+        url += `?doctor=${encodeURIComponent(docIdentifier)}`;
+      }
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      let invoices = [];
+      if (data.message && data.message.status === 'success') {
+        invoices = data.message.invoices || [];
+      } else if (data.message && Array.isArray(data.message)) {
+        invoices = data.message;
+      } else if (globalDoctorData && globalDoctorData.invoices) {
+        invoices = globalDoctorData.invoices;
+      } else {
+        console.error('Failed to load doctor billing records:', data);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--rose);">⚠️ Error loading billing records.</td></tr>';
+        return;
+      }
+
+      // Match the logged-in doctor's identity against the billing records
+      if (docObj) {
+        const docNames = [docObj.name, docObj.doctor_name, docObj.email].filter(Boolean).map(s => String(s).toLowerCase().trim());
+        invoices = invoices.filter(inv => {
+          if (!inv.doctor && !inv.doctor_name) return true;
+          const invDoc = String(inv.doctor || '').toLowerCase().trim();
+          const invDocName = String(inv.doctor_name || '').toLowerCase().trim();
+          return docNames.some(d => d === invDoc || d === invDocName || invDoc.includes(d) || invDocName.includes(d));
+        });
+      }
+
+      renderDoctorBilling(invoices);
+    } catch (err) {
+      console.error('Error fetching doctor billing invoices:', err);
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--rose);">⚠️ Failed to connect to billing server.</td></tr>';
+    }
+  }
+
+  function renderDoctorBilling(invoices) {
+    const tbody = $('doctor-billing-tbody');
+    if (!tbody) return;
+
+    const list = invoices || [];
+    // Calculate the KPI cards ("TOTAL INVOICED" and "TOTAL INVOICES")
+    const totalInvoiced = list.reduce((sum, inv) => sum + Number(inv.grand_total || inv.total_amount || 0), 0);
+    const totalCount = list.length;
+
+    if ($('doctorBilledTotal')) {
+      $('doctorBilledTotal').textContent = '₹' + totalInvoiced.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    if ($('doctorInvoicesCount')) {
+      $('doctorInvoicesCount').textContent = totalCount;
+    }
+
+    // When the API response arrives, clear/hide the "Loading billing records..." placeholder
+    // If empty: show "No billing records found."
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--text-dim);">No billing records found.</td></tr>';
+      return;
+    }
+
+    // Populate table rows
+    tbody.innerHTML = list.map(inv => {
+      const grand = Number(inv.grand_total || inv.total_amount || 0);
+      const status = inv.payment_status || 'Unpaid';
+      return `<tr>
+        <td><strong>${escapeHtml(inv.name)}</strong></td>
+        <td>${fmtDate(inv.invoice_date)}</td>
+        <td>${escapeHtml(inv.patient_name || inv.patient || '—')}</td>
+        <td><strong>₹${grand.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+        <td>${statusBadge(status)}</td>
+        <td>
+          <button class="btn-action" onclick="viewDoctorInvoiceSlip('${escapeHtml(inv.name)}')" title="View Invoice Slip">📄 Slip</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function viewDoctorInvoiceSlip(invoiceId) {
+    const modal = $('doctorSlipModal');
+    const container = $('doctorSlipContent');
+    const title = $('doctorSlipId');
+    if (title) title.textContent = invoiceId;
+    container.innerHTML = '<div style="text-align:center; padding:24px; color:var(--text-dim);">Loading invoice slip details...</div>';
+    modal.style.display = 'flex';
+
+    try {
+      const res = await fetch(`/api/method/hospital_management.api.get_invoice_details?invoice_id=${encodeURIComponent(invoiceId)}`);
+      const data = await res.json();
+      if (data.message && data.message.status === 'success') {
+        const inv = data.message.invoice;
+        const pat = inv.patient_details || {};
+        const doc = inv.doctor_details || {};
+        const items = inv.items || [];
+        const grand = Number(inv.grand_total || inv.total_amount || 0);
+        const paid = Number(inv.paid_amount || 0);
+        const outstanding = Number(inv.outstanding_amount !== undefined ? inv.outstanding_amount : Math.max(0, grand - paid));
+
+        container.innerHTML = `
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+              <div>
+                <div style="font-size:12px; color:var(--text-dim); text-transform:uppercase;">Patient</div>
+                <div style="font-weight:700; font-size:15px; color:var(--text);">${escapeHtml(pat.patient_name || inv.patient_name || inv.patient)}</div>
+                <div style="font-size:12px; color:var(--text-dim);">${escapeHtml(pat.phone || '')}</div>
+              </div>
+              <div>
+                <div style="font-size:12px; color:var(--text-dim); text-transform:uppercase;">Invoice Details</div>
+                <div style="font-weight:600; color:var(--text);">${escapeHtml(inv.name)} · ${inv.invoice_date || '—'}</div>
+                <div>Status: ${statusBadge(inv.payment_status || 'Unpaid')}</div>
+              </div>
+            </div>
+          </div>
+
+          <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:16px;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border); color:var(--text-dim); text-align:left;">
+                <th style="padding:8px 4px;">Service / Item</th>
+                <th style="padding:8px 4px; text-align:center;">Qty</th>
+                <th style="padding:8px 4px; text-align:right;">Rate</th>
+                <th style="padding:8px 4px; text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.length > 0 ? items.map(it => `
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:8px 4px;">${escapeHtml(it.item_name || 'Medical Service')}</td>
+                  <td style="padding:8px 4px; text-align:center;">${it.quantity || 1}</td>
+                  <td style="padding:8px 4px; text-align:right;">₹${Number(it.unit_price || 0).toFixed(2)}</td>
+                  <td style="padding:8px 4px; text-align:right;">₹${Number(it.amount || 0).toFixed(2)}</td>
+                </tr>
+              `).join('') : `
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td colspan="4" style="padding:8px 4px; text-align:center; color:var(--text-dim);">Consultation / Service Charges</td>
+                </tr>
+              `}
+            </tbody>
+          </table>
+
+          <div style="display:flex; justify-content:flex-end; font-size:13px;">
+            <div style="width:220px; line-height:1.8;">
+              <div style="display:flex; justify-content:space-between; color:var(--text-dim);">
+                <span>Subtotal:</span>
+                <span>₹${Number(inv.subtotal || grand).toFixed(2)}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-weight:700; color:var(--text); font-size:15px; border-top:1px solid var(--border); padding-top:4px;">
+                <span>Grand Total:</span>
+                <span>₹${grand.toFixed(2)}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; color:var(--green);">
+                <span>Paid Amount:</span>
+                <span>₹${paid.toFixed(2)}</span>
+              </div>
+              ${outstanding > 0 ? `
+                <div style="display:flex; justify-content:space-between; color:var(--rose); font-weight:600;">
+                  <span>Balance Due:</span>
+                  <span>₹${outstanding.toFixed(2)}</span>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      } else {
+        container.innerHTML = '<div style="text-align:center; padding:24px; color:var(--rose);">Could not load invoice details.</div>';
+      }
+    } catch (err) {
+      console.error('Error fetching slip:', err);
+      container.innerHTML = '<div style="text-align:center; padding:24px; color:var(--rose);">Server error loading invoice slip.</div>';
+    }
+  }
+
+  function closeDoctorSlipModal() {
+    $('doctorSlipModal').style.display = 'none';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   function confirmAndLogout() {

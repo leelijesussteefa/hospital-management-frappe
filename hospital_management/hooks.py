@@ -256,3 +256,21 @@ app_license = "mit"
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+
+# Document Events
+# ---------------
+doc_events = {
+    "Appointments": {
+        "after_insert": "hospital_management.api.send_booking_confirmation"
+    }
+}
+
+# Scheduled Tasks (Appointment Reminders every 15 minutes)
+# ---------------
+scheduler_events = {
+    "cron": {
+        "*/15 * * * *": [
+            "hospital_management.api.send_appointment_reminders"
+        ]
+    }
+}

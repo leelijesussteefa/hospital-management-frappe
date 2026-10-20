@@ -14,7 +14,14 @@
   "phone",
   "email",
   "consultation_fee",
-  "is_active"
+  "is_active",
+  "schedule_section",
+  "shift_start_time",
+  "shift_end_time",
+  "slot_duration_mins",
+  "break_start_time",
+  "break_end_time",
+  "working_days"
  ],
  "fields": [
   {
@@ -59,6 +66,47 @@
    "fieldname": "is_active",
    "fieldtype": "Check",
    "label": "Is Active"
+  },
+  {
+   "fieldname": "schedule_section",
+   "fieldtype": "Section Break",
+   "label": "Working Schedule & Shift Configuration"
+  },
+  {
+   "fieldname": "shift_start_time",
+   "fieldtype": "Time",
+   "label": "Shift Start Time",
+   "default": "09:00:00"
+  },
+  {
+   "fieldname": "shift_end_time",
+   "fieldtype": "Time",
+   "label": "Shift End Time",
+   "default": "18:00:00"
+  },
+  {
+   "fieldname": "slot_duration_mins",
+   "fieldtype": "Int",
+   "label": "Slot Duration (Minutes)",
+   "default": "30"
+  },
+  {
+   "fieldname": "break_start_time",
+   "fieldtype": "Time",
+   "label": "Break Start Time",
+   "default": "13:00:00"
+  },
+  {
+   "fieldname": "break_end_time",
+   "fieldtype": "Time",
+   "label": "Break End Time",
+   "default": "14:00:00"
+  },
+  {
+   "fieldname": "working_days",
+   "fieldtype": "Data",
+   "label": "Available Working Days",
+   "default": "Monday, Tuesday, Wednesday, Thursday, Friday, Saturday"
   }
  ],
  "grid_page_length": 50,

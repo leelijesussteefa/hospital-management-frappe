@@ -191,6 +191,124 @@
             color: var(--text-muted);
             font-size: 14px;
         }
+
+        .btn-receipt {
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-receipt:hover {
+            background: #38bdf8;
+            color: #0b0f19;
+        }
+        .badge-paid { background: rgba(16, 185, 129, 0.2) !important; color: #34d399 !important; }
+        .badge-unpaid { background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; }
+        .badge-partial { background: rgba(245, 158, 11, 0.2) !important; color: #fbbf24 !important; }
+        .badge-cancelled { background: rgba(148, 163, 184, 0.2) !important; color: #94a3b8 !important; }
+    
+        .btn-print-slip, .btn-prescription {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: #0284c7;
+            color: #ffffff !important;
+            border: 1px solid #0284c7;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+            white-space: nowrap;
+        }
+        .btn-print-slip:hover, .btn-prescription:hover {
+            background: #0369a1;
+            border-color: #0369a1;
+            color: #ffffff !important;
+            box-shadow: 0 2px 4px rgba(2, 132, 199, 0.35);
+            transform: translateY(-1px);
+        }
+        .btn-print-slip:active, .btn-prescription:active {
+            transform: translateY(0);
+        }
+    
+        /* Time Slot Grid & Badges */
+        .slot-spinner {
+            display: inline-block;
+            width: 22px;
+            height: 22px;
+            border: 2px solid rgba(56, 189, 248, 0.2);
+            border-radius: 50%;
+            border-top-color: #38bdf8;
+            animation: slot-spin 0.8s linear infinite;
+        }
+        @keyframes slot-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .slot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+            gap: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .slot-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 6px;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .slot-badge.available {
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #34d399;
+            cursor: pointer;
+        }
+        .slot-badge.available:hover {
+            background: rgba(16, 185, 129, 0.25);
+            border-color: #10b981;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+        }
+
+        .slot-badge.selected {
+            background: #0284c7 !important;
+            border: 1px solid #38bdf8 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5), inset 0 0 4px rgba(255, 255, 255, 0.3);
+            font-weight: 700;
+            transform: scale(1.02);
+        }
+
+        .slot-badge.unavailable {
+            background: rgba(51, 65, 85, 0.3);
+            border: 1px dashed rgba(71, 85, 105, 0.5);
+            color: #64748b;
+            text-decoration: line-through;
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
     </style>
 </head>
 <body>
@@ -210,7 +328,7 @@
                 <form id="appointmentForm" onsubmit="handleAppointmentBooking(event)">
                     <div class="form-group">
                         <label>Doctor *</label>
-                        <select id="doctorSelect" class="form-control" required>
+                        <select id="doctorSelect" class="form-control" onchange="handleDoctorOrDateChange()" required>
                             <option value="">-- Choose Doctor --</option>
                             {% if doctors %}
                                 {% for doc in doctors %}
@@ -221,12 +339,52 @@
                     </div>
                     <div class="form-group">
                         <label>Date *</label>
-                        <input type="date" id="appointmentDate" class="form-control" required>
+                        <input type="date" id="appointmentDate" class="form-control" onchange="handleDoctorOrDateChange()" required>
                     </div>
-                    <div class="form-group">
-                        <label>Preferred Time *</label>
-                        <input type="time" id="appointmentTime" class="form-control" value="10:00" required>
+
+                    <!-- Dynamic Interactive Slot Grid -->
+                    <div class="form-group" id="slotPickerSection">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label style="margin-bottom:0; font-weight:600; font-size:12.5px;">Available Time Slots *</label>
+                            <span id="slotHelperStatus" style="font-size:11px; color:var(--text-muted);">Pick doctor & date</span>
+                        </div>
+                        <input type="hidden" id="appointmentTime" name="appointment_time" value="" required>
+
+                        <div id="slotsContainer" style="min-height:92px; background:#0b1120; border:1px solid var(--border); border-radius:8px; padding:10px; transition:border-color 0.2s;">
+                            <!-- Placeholder -->
+                            <div id="slotsPlaceholder" style="text-align:center; padding:16px 8px; color:var(--text-muted); font-size:12px;">
+                                📅 Choose a Doctor and Date above to view live available slots.
+                            </div>
+
+                            <!-- Loading Spinner -->
+                            <div id="slotsSpinner" style="display:none; text-align:center; padding:18px 8px;">
+                                <div class="slot-spinner"></div>
+                                <div style="font-size:11.5px; color:var(--primary, #38bdf8); margin-top:6px; font-weight:500;">
+                                    Loading schedule & slots...
+                                </div>
+                            </div>
+
+                            <!-- Slots Grid -->
+                            <div id="slotsGrid" class="slot-grid" style="display:none;"></div>
+
+                            <!-- Notice / Alert Box -->
+                            <div id="slotsNotice" style="display:none; text-align:center; padding:12px; font-size:12px; border-radius:6px; margin-top:4px;"></div>
+                        </div>
+
+                        <!-- Legend -->
+                        <div id="slotsLegend" style="display:none; justify-content:space-between; margin-top:6px; font-size:10.5px; color:var(--text-muted); padding:0 4px;">
+                            <span style="display:inline-flex; align-items:center; gap:4px;">
+                                <span style="width:8px; height:8px; border-radius:2px; background:#10b981; display:inline-block;"></span> Available
+                            </span>
+                            <span style="display:inline-flex; align-items:center; gap:4px;">
+                                <span style="width:8px; height:8px; border-radius:2px; background:#0284c7; display:inline-block;"></span> Selected
+                            </span>
+                            <span style="display:inline-flex; align-items:center; gap:4px;">
+                                <span style="width:8px; height:8px; border-radius:2px; background:#64748b; display:inline-block;"></span> Booked / Past
+                            </span>
+                        </div>
                     </div>
+
                     <div class="form-group">
                         <label>Contact Phone</label>
                         <input type="text" id="contactPhone" class="form-control" placeholder="+91-0000000000">
@@ -262,6 +420,16 @@
                 </div>
             </div>
 
+            <div class="card" id="patientVitalsCard">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+                    <h2 class="card-title" style="margin-bottom:0;">💓 Your Health Vitals & Blood Sugar</h2>
+                    <span id="vitalsLastRecorded" style="font-size:12px; color:var(--text-muted);">Recorded: —</span>
+                </div>
+                <div id="patientVitalsContainer">
+                    <div class="empty-placeholder">Loading your health vitals...</div>
+                </div>
+            </div>
+
             <div class="card">
                 <h2 class="card-title">Your Prescriptions</h2>
                 <div class="table-responsive">
@@ -271,11 +439,38 @@
                                 <th>ID</th>
                                 <th>Doctor</th>
                                 <th>Date</th>
+                                <th style="text-align:right">Prescription</th>
                             </tr>
                         </thead>
                         <tbody id="prescriptionsTableBody">
                             <tr>
-                                <td colspan="3" class="empty-placeholder">No prescriptions recorded.</td>
+                                <td colspan="4" class="empty-placeholder">No prescriptions recorded.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:24px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h2 class="card-title" style="margin-bottom:0;">Your Invoices & Medical Bills</h2>
+                    <a href="/billing" style="font-size:12px; color:var(--primary, #38bdf8); text-decoration:none; font-weight:600;">Open Billing Portal ↗</a>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Invoice ID</th>
+                                <th>Date</th>
+                                <th>Doctor</th>
+                                <th>Total Amount</th>
+                                <th>Status</th>
+                                <th style="text-align:right">Receipt</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientInvoicesTableBody">
+                            <tr>
+                                <td colspan="6" class="empty-placeholder">Loading your invoices...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -381,6 +576,11 @@
                     return;
                 }
 
+                window.currentPatient = data.patient;
+                if (data.invoices) {
+                    window.dashboardInvoices = data.invoices;
+                }
+
                 document.getElementById("loggedPatientName").textContent = data.patient.patient_name || data.patient.name;
                 if (data.patient.phone) {
                     document.getElementById("contactPhone").value = data.patient.phone;
@@ -390,10 +590,10 @@
                 if (data.appointments && data.appointments.length > 0) {
                     apptBody.innerHTML = data.appointments.map(a => `
                         <tr>
-                            <td><strong>${a.doctor || "—"}</strong></td>
+                            <td><strong>${escapeHtml(a.doctor || "—")}</strong></td>
                             <td>${a.appointment_date || "—"} &nbsp;|&nbsp; ${a.appointment_time ? (a.appointment_time.length >= 8 ? a.appointment_time.slice(0,5) : a.appointment_time.slice(0,4)) : ""}</td>
                             <td><span class="badge-status">${a.status || "Scheduled"}</span></td>
-                            <td>${a.reason_for_visit || "—"}</td>
+                            <td>${escapeHtml(a.reason_for_visit || "—")}</td>
                         </tr>
                     `).join("");
                 } else {
@@ -402,35 +602,563 @@
 
                 const rxBody = document.getElementById("prescriptionsTableBody");
                 if (data.prescriptions && data.prescriptions.length > 0) {
-                    rxBody.innerHTML = data.prescriptions.map(p => `
+                    rxBody.innerHTML = data.prescriptions.map(rx => {
+                        const rxId = rx.id || rx.name;
+                        return `
                         <tr>
-                            <td><strong>${p.name}</strong></td>
-                            <td>${p.doctor || "—"}</td>
-                            <td>${p.prescription_date || "—"}</td>
+                            <td><strong>${escapeHtml(rx.name || rx.id)}</strong></td>
+                            <td>${escapeHtml(rx.doctor_name || rx.doctor || "—")}</td>
+                            <td>${rx.prescription_date || "—"}</td>
+                            <td style="text-align:right">
+                                <a href="/prescription_slip?name=${encodeURIComponent(rx.id || rx.name)}" target="_blank" class="btn-print-slip btn-prescription" title="Print Prescription Slip">
+                                    🖨️ Print / Slip
+                                </a>
+                            </td>
                         </tr>
-                    `).join("");
+                    `}).join("");
                 } else {
-                    rxBody.innerHTML = '<tr><td colspan="3" class="empty-placeholder">No prescriptions recorded.</td></tr>';
+                    rxBody.innerHTML = '<tr><td colspan="4" class="empty-placeholder">No prescriptions recorded.</td></tr>';
                 }
+
+                // Render patient health vitals & blood sugar
+                renderPatientVitals(data.latest_vitals);
+
+                // Fetch invoices for this logged in patient
+                await loadPatientInvoices(data.patient.name || data.patient.email);
 
             } catch (err) {
                 console.error("Error loading dashboard data:", err);
+                const invBody = document.getElementById("patientInvoicesTableBody");
+                if (invBody) {
+                    invBody.innerHTML = '<tr><td colspan="6" class="empty-placeholder" style="color:var(--danger);">⚠️ Error loading dashboard data.</td></tr>';
+                }
             }
         }
 
+
         // ─────────────────────────────────────────────
-        // 5. Book Appointment
+        // 4b. Render Health Vitals & Blood Sugar
+        // ─────────────────────────────────────────────
+        function renderPatientVitals(v) {
+            const container = document.getElementById("patientVitalsContainer");
+            const timeEl = document.getElementById("vitalsLastRecorded");
+            if (!container) return;
+
+            if (!v) {
+                if (timeEl) timeEl.textContent = "Status: Not recorded";
+                container.innerHTML = `
+                    <div class="empty-placeholder" style="padding:24px; text-align:center;">
+                        <span style="font-size:24px; display:block; margin-bottom:8px;">🩺</span>
+                        <p style="font-weight:600; color:var(--text-main); margin-bottom:4px;">No Vital Signs Recorded Yet</p>
+                        <p style="font-size:12px; color:var(--text-muted); max-width:480px; margin:0 auto;">
+                            During your hospital consultation, nursing staff will record your Blood Pressure, Heart Rate, BMI, and Blood Glucose levels which will appear here with clinical guidance.
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+            if (timeEl && v.recorded_date_time) {
+                timeEl.textContent = "Last Recorded: " + new Date(v.recorded_date_time).toLocaleDateString('en-IN', {
+                    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+            }
+
+            let bpStatus = "Normal";
+            let bpClass = "badge-paid";
+            if (v.bp_systolic && v.bp_diastolic) {
+                if (v.bp_systolic >= 140 || v.bp_diastolic >= 90) {
+                    bpStatus = "Stage 2 HTN";
+                    bpClass = "badge-unpaid";
+                } else if (v.bp_systolic >= 130 || v.bp_diastolic >= 80) {
+                    bpStatus = "Stage 1 HTN";
+                    bpClass = "badge-partial";
+                } else if (v.bp_systolic >= 120 && v.bp_diastolic < 80) {
+                    bpStatus = "Elevated";
+                    bpClass = "badge-partial";
+                } else {
+                    bpStatus = "Normal BP";
+                    bpClass = "badge-paid";
+                }
+            }
+
+            let bmiClass = "badge-paid";
+            if (v.bmi_status === "Overweight") bmiClass = "badge-partial";
+            else if (v.bmi_status === "Obese") bmiClass = "badge-unpaid";
+            else if (v.bmi_status === "Underweight") bmiClass = "badge-status";
+
+            let sugarClass = "badge-paid";
+            if (v.sugar_remarks === "High / Diabetic") sugarClass = "badge-unpaid";
+            else if (v.sugar_remarks === "Pre-diabetic") sugarClass = "badge-partial";
+
+            container.innerHTML = `
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:16px; margin-bottom:20px;">
+                    <!-- BP Card -->
+                    <div style="background:#0f172a; border:1px solid var(--border); border-radius:10px; padding:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:600;">Blood Pressure</span>
+                            <span class="badge-status ${bpClass}">${bpStatus}</span>
+                        </div>
+                        <div style="font-size:22px; font-weight:800; color:#f8fafc;">${v.bp_display || (v.bp_systolic ? v.bp_systolic + '/' + v.bp_diastolic + ' mmHg' : '—')}</div>
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Ref: &lt; 120/80 mmHg (Optimal)</div>
+                    </div>
+
+                    <!-- Pulse & Oxygen Card -->
+                    <div style="background:#0f172a; border:1px solid var(--border); border-radius:10px; padding:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:600;">Pulse & Oxygen</span>
+                            <span class="badge-status badge-paid">Stable</span>
+                        </div>
+                        <div style="font-size:22px; font-weight:800; color:#f8fafc;">
+                            ${v.pulse_rate ? v.pulse_rate + ' <span style="font-size:13px; font-weight:500;">bpm</span>' : '—'}
+                            ${v.spo2 ? '&nbsp;·&nbsp;' + v.spo2 + '<span style="font-size:13px; font-weight:500;">% SpO2</span>' : ''}
+                        </div>
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Ref: 60-100 bpm | SpO2 &gt; 95%</div>
+                    </div>
+
+                    <!-- Temp & Weight -->
+                    <div style="background:#0f172a; border:1px solid var(--border); border-radius:10px; padding:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:600;">Body Temp & Weight</span>
+                            ${v.temperature ? `<span class="badge-status badge-paid">${v.temperature} °F</span>` : ''}
+                        </div>
+                        <div style="font-size:22px; font-weight:800; color:#f8fafc;">
+                            ${v.weight_kg ? v.weight_kg + ' <span style="font-size:13px; font-weight:500;">kg</span>' : '—'}
+                            ${v.height_cm ? '<span style="font-size:14px; font-weight:500; color:var(--text-muted);"> (' + v.height_cm + ' cm)</span>' : ''}
+                        </div>
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Ref Temp: 97.8 - 99.1 °F</div>
+                    </div>
+
+                    <!-- BMI Card -->
+                    <div style="background:#0f172a; border:1px solid var(--border); border-radius:10px; padding:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:600;">Body Mass Index</span>
+                            ${v.bmi_status ? `<span class="badge-status ${bmiClass}">${v.bmi_status}</span>` : ''}
+                        </div>
+                        <div style="font-size:22px; font-weight:800; color:#f8fafc;">${v.bmi ? v.bmi : '—'} <span style="font-size:13px; font-weight:500; color:var(--text-muted);">kg/m²</span></div>
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Healthy Range: 18.5 - 24.9</div>
+                    </div>
+                </div>
+
+                <!-- Blood Glucose Panel -->
+                <div style="background:#0f172a; border:1px solid var(--border); border-left:4px solid #ec4899; border-radius:10px; padding:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <div style="font-weight:700; font-size:14px; color:#f8fafc; display:flex; align-items:center; gap:8px;">
+                            <span>🩸</span> Blood Glucose Monitoring (mg/dL)
+                        </div>
+                        ${v.sugar_remarks ? `<span class="badge-status ${sugarClass}">${v.sugar_remarks}</span>` : ''}
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:12px;">
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px 14px;">
+                            <div style="font-size:11px; color:var(--text-muted);">Fasting Blood Sugar (FBS)</div>
+                            <div style="font-size:18px; font-weight:700; color:#f8fafc; margin-top:2px;">
+                                ${v.blood_sugar_fasting ? v.blood_sugar_fasting + ' <span style="font-size:11px; color:var(--text-muted);">mg/dL</span>' : '—'}
+                            </div>
+                            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Ref: 70 - 99 mg/dL</div>
+                        </div>
+
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px 14px;">
+                            <div style="font-size:11px; color:var(--text-muted);">Postprandial (PPBS)</div>
+                            <div style="font-size:18px; font-weight:700; color:#f8fafc; margin-top:2px;">
+                                ${v.blood_sugar_postprandial ? v.blood_sugar_postprandial + ' <span style="font-size:11px; color:var(--text-muted);">mg/dL</span>' : '—'}
+                            </div>
+                            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Ref: &lt; 140 mg/dL</div>
+                        </div>
+
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px 14px;">
+                            <div style="font-size:11px; color:var(--text-muted);">Random Blood Sugar (RBS)</div>
+                            <div style="font-size:18px; font-weight:700; color:#f8fafc; margin-top:2px;">
+                                ${v.blood_sugar_random ? v.blood_sugar_random + ' <span style="font-size:11px; color:var(--text-muted);">mg/dL</span>' : '—'}
+                            </div>
+                            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">Ref: 70 - 139 mg/dL</div>
+                        </div>
+                    </div>
+
+                    <div style="font-size:11px; color:var(--text-muted); border-top:1px solid rgba(255,255,255,0.06); padding-top:8px;">
+                        💡 <strong>Standard Clinical Guidance:</strong> Fasting: &lt;100 mg/dL Normal, 100-125 Pre-diabetic, ≥126 Diabetic. Postprandial: &lt;140 Normal, 140-199 Pre-diabetic, ≥200 Diabetic.
+                    </div>
+                </div>
+            `;
+        }
+
+        // ─────────────────────────────────────────────
+        // 5. Load Patient Invoices
+        // ─────────────────────────────────────────────
+        async function loadPatientInvoices(patientId) {
+            const tbody = document.getElementById("patientInvoicesTableBody");
+            if (!tbody) return;
+
+            try {
+                // Ensure the API request correctly passes patient identifier (ID, email, or session user)
+                const identifier = patientId || (window.currentPatient && (window.currentPatient.name || window.currentPatient.email)) || "";
+                let url = "/api/method/hospital_management.api.get_invoices";
+                if (identifier) {
+                    url += `?patient=${encodeURIComponent(identifier)}`;
+                }
+
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.message && data.message.status === "success") {
+                    const invoices = data.message.invoices || [];
+                    renderPatientInvoices(invoices);
+                } else if (data.message && Array.isArray(data.message)) {
+                    renderPatientInvoices(data.message);
+                } else if (window.dashboardInvoices) {
+                    renderPatientInvoices(window.dashboardInvoices);
+                } else {
+                    console.error("Failed to load patient invoices:", data);
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-placeholder" style="color:var(--danger);">⚠️ Error loading invoices. Please refresh.</td></tr>';
+                }
+            } catch (err) {
+                console.error("Error fetching patient invoices:", err);
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-placeholder" style="color:var(--danger);">⚠️ Failed to connect to billing server.</td></tr>';
+            }
+        }
+
+        function renderPatientInvoices(invoices) {
+            const tbody = document.getElementById("patientInvoicesTableBody");
+            if (!tbody) return;
+
+            if (!invoices || invoices.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-placeholder">No invoices found for your account.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = invoices.map(inv => {
+                const grand = Number(inv.grand_total || inv.total_amount || 0);
+                const status = inv.payment_status || "Unpaid";
+                let badgeClass = "badge-unpaid";
+                if (status === "Paid") badgeClass = "badge-paid";
+                else if (status === "Partially Paid") badgeClass = "badge-partial";
+                else if (status === "Cancelled") badgeClass = "badge-cancelled";
+
+                return `
+                    <tr>
+                        <td><strong>${escapeHtml(inv.name)}</strong></td>
+                        <td>${inv.invoice_date || "—"}</td>
+                        <td>${escapeHtml(inv.doctor_name || inv.doctor || "Hospital Attending")}</td>
+                        <td><strong>₹${grand.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                        <td><span class="badge-status ${badgeClass}">${status}</span></td>
+                        <td style="text-align:right">
+                            <button class="btn-receipt" onclick="viewPatientReceipt('${escapeHtml(inv.name)}')" title="View / Print Receipt">
+                                🧾 Receipt
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        async function viewPatientReceipt(invoiceId) {
+            const modal = document.getElementById("patientReceiptModal");
+            const body = document.getElementById("patientReceiptModalBody");
+            body.innerHTML = '<div style="text-align:center; padding:30px; color:#94a3b8;">Loading receipt details...</div>';
+            modal.style.display = "flex";
+
+            try {
+                const res = await fetch(`/api/method/hospital_management.api.get_invoice_details?invoice_id=${encodeURIComponent(invoiceId)}`);
+                const data = await res.json();
+                if (data.message && data.message.status === "success") {
+                    const inv = data.message.invoice;
+                    const pat = inv.patient_details || {};
+                    const doc = inv.doctor_details || {};
+                    const items = inv.items || [];
+                    const grand = Number(inv.grand_total || inv.total_amount || 0);
+                    const paid = Number(inv.paid_amount || 0);
+                    const outstanding = Number(inv.outstanding_amount !== undefined ? inv.outstanding_amount : Math.max(0, grand - paid));
+
+                    body.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:16px; font-size:13px; color:#cbd5e1; flex-wrap:wrap; gap:12px;">
+                            <div>
+                                <div><strong>Invoice ID:</strong> ${escapeHtml(inv.name)}</div>
+                                <div><strong>Date:</strong> ${inv.invoice_date || "—"}</div>
+                                ${inv.appointment ? `<div><strong>Appointment:</strong> ${escapeHtml(inv.appointment)}</div>` : ""}
+                            </div>
+                            <div style="text-align:right;">
+                                <div><strong>Payment Status:</strong> <span class="badge-status ${inv.payment_status === 'Paid' ? 'badge-paid' : 'badge-unpaid'}">${inv.payment_status || 'Unpaid'}</span></div>
+                                <div><strong>Payment Method:</strong> ${escapeHtml(inv.payment_method || 'Cash')}</div>
+                            </div>
+                        </div>
+
+                        <div style="background:#0f172a; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <div>
+                                    <span style="color:#94a3b8; font-size:11px; text-transform:uppercase;">Patient</span>
+                                    <div style="font-weight:600; color:#f8fafc;">${escapeHtml(pat.patient_name || inv.patient_name || inv.patient)}</div>
+                                    <div style="color:#94a3b8; font-size:12px;">${escapeHtml(pat.phone || "")}</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <span style="color:#94a3b8; font-size:11px; text-transform:uppercase;">Doctor</span>
+                                    <div style="font-weight:600; color:#f8fafc;">Dr. ${escapeHtml(doc.doctor_name || inv.doctor_name || inv.doctor || "Attending")}</div>
+                                    <div style="color:#94a3b8; font-size:12px;">${escapeHtml(doc.department || doc.specialization || "")}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:16px;">
+                            <thead>
+                                <tr style="border-bottom:1px solid #2e3a52; color:#94a3b8; text-transform:uppercase; font-size:11px;">
+                                    <th style="padding:8px 4px; text-align:left;">Item / Service</th>
+                                    <th style="padding:8px 4px; text-align:center;">Qty</th>
+                                    <th style="padding:8px 4px; text-align:right;">Price</th>
+                                    <th style="padding:8px 4px; text-align:right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${items.length > 0 ? items.map(it => `
+                                    <tr style="border-bottom:1px solid rgba(46,58,82,0.5);">
+                                        <td style="padding:8px 4px;">${escapeHtml(it.item_name || 'Medical Service')}</td>
+                                        <td style="padding:8px 4px; text-align:center;">${it.quantity || 1}</td>
+                                        <td style="padding:8px 4px; text-align:right;">₹${Number(it.unit_price || 0).toFixed(2)}</td>
+                                        <td style="padding:8px 4px; text-align:right;">₹${Number(it.amount || 0).toFixed(2)}</td>
+                                    </tr>
+                                `).join('') : `
+                                    <tr style="border-bottom:1px solid rgba(46,58,82,0.5);">
+                                        <td colspan="4" style="padding:8px 4px; text-align:center; color:#94a3b8;">Consultation / Medical Charge</td>
+                                    </tr>
+                                `}
+                            </tbody>
+                        </table>
+
+                        <div style="display:flex; justify-content:flex-end; font-size:13px;">
+                            <div style="width:240px; line-height:1.8;">
+                                <div style="display:flex; justify-content:space-between; color:#94a3b8;">
+                                    <span>Subtotal:</span>
+                                    <span>₹${Number(inv.subtotal || grand).toFixed(2)}</span>
+                                </div>
+                                ${Number(inv.discount_amount || 0) > 0 ? `
+                                    <div style="display:flex; justify-content:space-between; color:#34d399;">
+                                        <span>Discount:</span>
+                                        <span>-₹${Number(inv.discount_amount).toFixed(2)}</span>
+                                    </div>
+                                ` : ''}
+                                <div style="display:flex; justify-content:space-between; font-weight:700; color:#f8fafc; font-size:15px; border-top:1px solid #2e3a52; padding-top:4px;">
+                                    <span>Grand Total:</span>
+                                    <span>₹${grand.toFixed(2)}</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; color:#34d399;">
+                                    <span>Amount Paid:</span>
+                                    <span>₹${paid.toFixed(2)}</span>
+                                </div>
+                                ${outstanding > 0 ? `
+                                    <div style="display:flex; justify-content:space-between; color:#f87171; font-weight:600;">
+                                        <span>Balance Due:</span>
+                                        <span>₹${outstanding.toFixed(2)}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    body.innerHTML = '<div style="text-align:center; padding:30px; color:#ef4444;">Could not load invoice receipt details.</div>';
+                }
+            } catch (err) {
+                console.error("Error loading receipt:", err);
+                body.innerHTML = '<div style="text-align:center; padding:30px; color:#ef4444;">Server error loading receipt.</div>';
+            }
+        }
+
+        function closePatientReceipt() {
+            document.getElementById("patientReceiptModal").style.display = "none";
+        }
+
+        function printPatientReceipt() {
+            window.print();
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // ─────────────────────────────────────────────
+        // 5. Time Slot Picker & Real-Time Availability
+        // ─────────────────────────────────────────────
+        let selectedSlotTime = "";
+
+        function initDatePicker() {
+            const dateInput = document.getElementById("appointmentDate");
+            if (dateInput) {
+                const todayStr = new Date().toISOString().split("T")[0];
+                dateInput.min = todayStr;
+                if (!dateInput.value) {
+                    dateInput.value = todayStr;
+                }
+            }
+        }
+
+        async function handleDoctorOrDateChange() {
+            const doc = document.getElementById("doctorSelect").value;
+            const date = document.getElementById("appointmentDate").value;
+
+            // Clear previously selected slot
+            selectedSlotTime = "";
+            document.getElementById("appointmentTime").value = "";
+            const statusEl = document.getElementById("slotHelperStatus");
+            statusEl.textContent = "Select a slot";
+            statusEl.style.color = "var(--text-muted)";
+
+            if (!doc || !date) {
+                document.getElementById("slotsPlaceholder").style.display = "block";
+                document.getElementById("slotsSpinner").style.display = "none";
+                document.getElementById("slotsGrid").style.display = "none";
+                document.getElementById("slotsNotice").style.display = "none";
+                document.getElementById("slotsLegend").style.display = "none";
+                return;
+            }
+
+            await fetchAvailableSlots(doc, date);
+        }
+
+        async function fetchAvailableSlots(doctor, date) {
+            const placeholder = document.getElementById("slotsPlaceholder");
+            const spinner = document.getElementById("slotsSpinner");
+            const grid = document.getElementById("slotsGrid");
+            const notice = document.getElementById("slotsNotice");
+            const legend = document.getElementById("slotsLegend");
+            const statusEl = document.getElementById("slotHelperStatus");
+
+            placeholder.style.display = "none";
+            grid.style.display = "none";
+            notice.style.display = "none";
+            legend.style.display = "none";
+            spinner.style.display = "block";
+
+            try {
+                const url = `/api/method/hospital_management.api.get_available_slots?doctor=${encodeURIComponent(doctor)}&date=${encodeURIComponent(date)}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                const result = data.message || {};
+
+                spinner.style.display = "none";
+
+                if (result.status === "error") {
+                    notice.style.display = "block";
+                    notice.style.background = "rgba(239, 68, 68, 0.12)";
+                    notice.style.border = "1px solid rgba(239, 68, 68, 0.35)";
+                    notice.style.color = "#f87171";
+                    notice.textContent = "⚠️ " + (result.message || "Slots could not be loaded.");
+                    statusEl.textContent = "Unavailable";
+                    statusEl.style.color = "#f87171";
+                    return;
+                }
+
+                const slots = result.slots || [];
+                if (slots.length === 0) {
+                    notice.style.display = "block";
+                    notice.style.background = "rgba(245, 158, 11, 0.12)";
+                    notice.style.border = "1px solid rgba(245, 158, 11, 0.35)";
+                    notice.style.color = "#fbbf24";
+                    notice.textContent = "ℹ️ No consultation slots available for this date. Please pick another date.";
+                    statusEl.textContent = "No slots";
+                    statusEl.style.color = "#fbbf24";
+                    return;
+                }
+
+                grid.innerHTML = "";
+                let availableCount = 0;
+
+                slots.forEach(slot => {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.textContent = slot.time;
+                    btn.className = "slot-badge " + (slot.available ? "available" : "unavailable");
+
+                    if (slot.available) {
+                        availableCount++;
+                        btn.onclick = () => selectSlot(slot.time_24 || slot.time, slot.time, btn);
+                    } else {
+                        btn.disabled = true;
+                        btn.title = slot.reason || "Slot unavailable";
+                    }
+                    grid.appendChild(btn);
+                });
+
+                grid.style.display = "grid";
+                legend.style.display = "flex";
+
+                if (availableCount === 0) {
+                    statusEl.textContent = "Fully Booked";
+                    statusEl.style.color = "#f87171";
+                    notice.style.display = "block";
+                    notice.style.background = "rgba(239, 68, 68, 0.12)";
+                    notice.style.border = "1px solid rgba(239, 68, 68, 0.35)";
+                    notice.style.color = "#f87171";
+                    notice.textContent = "⚠️ All slots for this date are fully booked or have passed. Please select another date.";
+                } else {
+                    statusEl.textContent = `${availableCount} slots open`;
+                    statusEl.style.color = "#34d399";
+                }
+
+            } catch (err) {
+                console.error("Error fetching slots:", err);
+                spinner.style.display = "none";
+                notice.style.display = "block";
+                notice.style.background = "rgba(239, 68, 68, 0.12)";
+                notice.style.border = "1px solid rgba(239, 68, 68, 0.35)";
+                notice.style.color = "#f87171";
+                notice.textContent = "⚠️ Failed to fetch available slots from server. Please refresh.";
+            }
+        }
+
+        function selectSlot(time24, time12, btnEl) {
+            selectedSlotTime = time24;
+            document.getElementById("appointmentTime").value = time24;
+
+            // Remove selected class from all slots
+            document.querySelectorAll("#slotsGrid .slot-badge").forEach(b => {
+                b.classList.remove("selected");
+            });
+
+            // Add selected class to clicked slot
+            btnEl.classList.add("selected");
+
+            const statusEl = document.getElementById("slotHelperStatus");
+            statusEl.textContent = `Selected: ${time12}`;
+            statusEl.style.color = "#38bdf8";
+
+            // Reset container border highlight
+            document.getElementById("slotsContainer").style.borderColor = "var(--border)";
+        }
+
+        // ─────────────────────────────────────────────
+        // 6. Book Appointment (Anti-Double-Booking Validated)
         // ─────────────────────────────────────────────
         async function handleAppointmentBooking(e) {
             e.preventDefault();
+
+            const doctorVal = document.getElementById("doctorSelect").value;
+            const dateVal = document.getElementById("appointmentDate").value;
+            const timeVal = document.getElementById("appointmentTime").value;
+
+            if (!doctorVal) {
+                alert("Please choose a Doctor.");
+                document.getElementById("doctorSelect").focus();
+                return;
+            }
+            if (!dateVal) {
+                alert("Please select an Appointment Date.");
+                document.getElementById("appointmentDate").focus();
+                return;
+            }
+            if (!timeVal) {
+                alert("Please select an available Time Slot from the grid.");
+                const container = document.getElementById("slotsContainer");
+                container.style.borderColor = "#ef4444";
+                container.scrollIntoView({ behavior: "smooth", block: "center" });
+                return;
+            }
+
             const submitBtn = document.getElementById("bookSubmitBtn");
             submitBtn.disabled = true;
             submitBtn.textContent = "Booking...";
 
             const payload = {
-                doctor: document.getElementById("doctorSelect").value,
-                appointment_date: document.getElementById("appointmentDate").value,
-                appointment_time: document.getElementById("appointmentTime").value,
+                doctor: doctorVal,
+                appointment_date: dateVal,
+                appointment_time: timeVal,
                 reason_for_visit: document.getElementById("reasonVisit").value,
                 phone_number: document.getElementById("contactPhone").value
             };
@@ -447,15 +1175,29 @@
 
                 const res = await response.json();
                 if (res.message && res.message.status === "success") {
-                    alert("Appointment booked successfully! ID: " + res.message.appointment);
+                    alert("Appointment booked successfully! ID: " + res.message.appointment + " (" + (res.message.time || timeVal) + ")");
                     document.getElementById("reasonVisit").value = "";
-                    loadPatientDashboard();
+                    document.getElementById("appointmentTime").value = "";
+                    
+                    // Refresh slots and patient dashboard
+                    await fetchAvailableSlots(doctorVal, dateVal);
+                    await loadPatientDashboard();
+        setTimeout(handleDoctorOrDateChange, 300);
                 } else {
-                    alert("Booking failed: " + (res.message || "Please check provided details."));
+                    let errMsg = res.message || "";
+                    if (res._server_messages) {
+                        try {
+                            const parsed = JSON.parse(res._server_messages);
+                            errMsg = parsed.map(m => JSON.parse(m).message).join("\n");
+                        } catch(e) {}
+                    }
+                    alert(errMsg || "This time slot has just been booked by another patient. Please choose another slot.");
+                    // Refresh slots immediately to reflect conflict
+                    await fetchAvailableSlots(doctorVal, dateVal);
                 }
             } catch (err) {
                 console.error("Booking error:", err);
-                alert("Server error occurred while booking.");
+                alert("Server error occurred while booking. Please try again.");
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = "Confirm Booking";
@@ -466,8 +1208,29 @@
             return window.csrf_token || (typeof frappe !== "undefined" && frappe.csrf_token) || "";
         }
 
+        initDatePicker();
         loadDoctorsList();
         loadPatientDashboard();
+        setTimeout(handleDoctorOrDateChange, 300);
     </script>
+    <!-- Patient Receipt Modal -->
+    <div class="modal-backdrop" id="patientReceiptModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); z-index:1000; align-items:center; justify-content:center; padding:16px;">
+        <div style="background:#111827; border:1px solid #2e3a52; border-radius:12px; width:100%; max-width:640px; max-height:90vh; overflow-y:auto; padding:24px; position:relative; box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid #2e3a52; padding-bottom:16px; margin-bottom:20px;">
+                <div>
+                    <h3 style="color:#38bdf8; font-size:18px; font-weight:700;">🏥 CarePlus Multispeciality Hospital</h3>
+                    <p style="color:#94a3b8; font-size:12px; margin-top:2px;">Official Medical Receipt & Tax Invoice</p>
+                </div>
+                <button onclick="closePatientReceipt()" style="background:transparent; border:none; color:#94a3b8; font-size:24px; cursor:pointer; line-height:1;">&times;</button>
+            </div>
+            <div id="patientReceiptModalBody">
+                <div style="text-align:center; padding:30px; color:#94a3b8;">Loading receipt details...</div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px; border-top:1px solid #2e3a52; padding-top:16px;">
+                <button onclick="printPatientReceipt()" style="background:#0284c7; color:#fff; border:none; padding:8px 18px; border-radius:6px; font-weight:600; cursor:pointer;">🖨️ Print Receipt</button>
+                <button onclick="closePatientReceipt()" style="background:#1f293d; color:#94a3b8; border:1px solid #2e3a52; padding:8px 18px; border-radius:6px; font-weight:600; cursor:pointer;">Close</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

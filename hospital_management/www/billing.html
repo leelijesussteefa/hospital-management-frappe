@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CarePlus | Hospital Billing & Invoicing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base: #090d16;
+      --bg-surface: #0f172a;
+      --bg-surface-elevated: #1e293b;
+      --bg-surface-glass: rgba(15, 23, 42, 0.75);
+      --border: #334155;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --primary-dark: #0284c7;
+      --accent-indigo: #6366f1;
+      --emerald: #10b981;
+      --emerald-bg: rgba(16, 185, 129, 0.12);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.12);
+      --rose: #f43f5e;
+      --rose-bg: rgba(244, 63, 94, 0.12);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dark: #64748b;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+    body {
+      background: var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* TOP NAVBAR */
+    .navbar {
+      height: 70px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--primary), var(--accent-indigo));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+
+    .brand-text h1 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: #fff;
+    }
+    .brand-text span {
+      color: var(--primary);
+    }
+    .brand-text p {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--accent-indigo));
+      color: #fff;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+    .btn-primary:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover {
+      background: var(--bg-surface-elevated);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .btn-success {
+      background: var(--emerald);
+      color: #fff;
+    }
+    .btn-success:hover {
+      opacity: 0.9;
+    }
+
+    .btn-danger {
+      background: var(--rose-bg);
+      color: var(--rose);
+      border: 1px solid rgba(244, 63, 94, 0.25);
+    }
+    .btn-danger:hover {
+      background: var(--rose);
+      color: #fff;
+    }
+
+    /* MAIN CONTAINER */
+    .container {
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px 24px 60px;
+      flex: 1;
+    }
+
+    /* PAGE HEADER */
+    .header-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .header-info h2 {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-info p {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* STATS / KPI GRID */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin-bottom: 32px;
+    }
+
+    .kpi-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.25s ease;
+    }
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(56, 189, 248, 0.4);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .kpi-blue::before { background: linear-gradient(90deg, var(--primary), #3b82f6); }
+    .kpi-green::before { background: linear-gradient(90deg, #10b981, #34d399); }
+    .kpi-amber::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .kpi-purple::before { background: linear-gradient(90deg, #8b5cf6, #a855f7); }
+
+    .kpi-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .kpi-icon {
+      font-size: 20px;
+    }
+
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+      margin: 12px 0 6px;
+      letter-spacing: -0.5px;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--text-dark);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* CONTROLS & FILTER BAR */
+    .controls-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 22px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .search-box {
+      flex: 1;
+      min-width: 260px;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      color: #fff;
+      font-size: 14px;
+      padding: 10px 14px 10px 38px;
+      border-radius: 9px;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .search-box input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-glow);
+    }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dark);
+      font-size: 16px;
+    }
+
+    .filter-pills {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .pill:hover {
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .pill.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .date-filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .date-filter-group input {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      outline: none;
+    }
+
+    /* DATA TABLE */
+    .table-container {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    thead th {
+      background: rgba(30, 41, 59, 0.6);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border-subtle);
+      transition: background 0.15s ease;
+    }
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    tbody td {
+      padding: 16px 20px;
+      font-size: 13.5px;
+      vertical-align: middle;
+    }
+
+    .invoice-id-badge {
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      background: rgba(56, 189, 248, 0.1);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    .patient-cell {
+      display: flex;
+      flex-direction: column;
+    }
+    .patient-name {
+      font-weight: 600;
+      color: #fff;
+    }
+    .patient-sub {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .doctor-cell {
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    .amount-cell {
+      font-weight: 700;
+      color: #fff;
+    }
+    .balance-due {
+      font-size: 11.5px;
+      color: var(--amber);
+    }
+
+    /* BADGES */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+
+    .badge-paid {
+      background: var(--emerald-bg);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .badge-paid .badge-dot { background: var(--emerald); }
+
+    .badge-unpaid {
+      background: var(--amber-bg);
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+    .badge-unpaid .badge-dot { background: var(--amber); }
+
+    .badge-partially-paid {
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--accent-indigo);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+    }
+    .badge-partially-paid .badge-dot { background: var(--accent-indigo); }
+
+    .badge-cancelled {
+      background: var(--rose-bg);
+      color: var(--rose);
+      border: 1px solid rgba(244, 63, 94, 0.25);
+    }
+    .badge-cancelled .badge-dot { background: var(--rose); }
+
+    /* ACTION BUTTONS */
+    .actions-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-surface-elevated);
+      color: var(--text-main);
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-action:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      transform: translateY(-1px);
+    }
+
+    .btn-action-pay {
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--emerald);
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .btn-action-pay:hover {
+      background: var(--emerald);
+      color: #fff;
+    }
+
+    /* EMPTY & LOADING STATES */
+    .state-message {
+      text-align: center;
+      padding: 50px 20px;
+      color: var(--text-muted);
+    }
+    .state-message .icon { font-size: 40px; margin-bottom: 12px; }
+
+    /* MODAL BASE */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      width: 100%;
+      max-width: 600px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: modalFadeIn 0.25s ease-out;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.96) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .btn-close {
+      background: transparent;
+      border: none;
+      color: var(--text-dark);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .btn-close:hover { color: #fff; }
+
+    .modal-body {
+      padding: 24px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    /* FORM STYLES */
+    .form-group {
+      margin-bottom: 18px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-control {
+      width: 100%;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 11px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-control:focus {
+      border-color: var(--primary);
+    }
+    select.form-control option {
+      background: var(--bg-surface-elevated);
+      color: #fff;
+    }
+
+    .due-callout {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .due-callout .label {
+      font-size: 13px;
+      color: var(--amber);
+      font-weight: 600;
+    }
+    .due-callout .amount {
+      font-size: 20px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    /* ========================================================= */
+    /* PRINTABLE INVOICE SLIP (MODAL & PRINT STYLING)            */
+    /* ========================================================= */
+    .receipt-modal-box {
+      max-width: 820px;
+      background: #ffffff;
+      color: #0f172a;
+    }
+
+    .printable-invoice {
+      background: #ffffff;
+      color: #0f172a;
+      padding: 36px 40px;
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+
+    .hospital-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+
+    .hosp-brand h2 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #0369a1;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hosp-brand p {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .bill-meta {
+      text-align: right;
+    }
+    .bill-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .bill-meta p {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 3px;
+    }
+    .print-status-badge {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .print-paid {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+    }
+    .print-unpaid {
+      background: #fef3c7;
+      color: #b45309;
+      border: 1px solid #fcd34d;
+    }
+
+    .patient-doc-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      background: #f8fafc;
+      padding: 16px 20px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 24px;
+    }
+    .info-col h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #64748b;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+    .info-col .name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .info-col p {
+      font-size: 12.5px;
+      color: #334155;
+      margin-top: 2px;
+    }
+
+    .print-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+    }
+    .print-table th {
+      background: #f1f5f9;
+      color: #334155;
+      font-size: 11.5px;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      border-bottom: 1.5px solid #cbd5e1;
+      font-weight: 700;
+    }
+    .print-table td {
+      padding: 11px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #1e293b;
+      font-size: 13px;
+    }
+    .print-table .text-right { text-align: right; }
+    .print-table .text-center { text-align: center; }
+
+    .summary-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-top: 10px;
+    }
+    .payment-history-box {
+      width: 50%;
+      font-size: 12px;
+      color: #475569;
+    }
+    .payment-history-box h4 {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      color: #0f172a;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .totals-box {
+      width: 42%;
+      background: #f8fafc;
+      padding: 14px 18px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #475569;
+    }
+    .totals-row.grand-total {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0f172a;
+      border-top: 1.5px solid #cbd5e1;
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+    .totals-row.balance {
+      font-size: 14px;
+      font-weight: 700;
+      color: #b45309;
+      margin-top: 4px;
+    }
+
+    .receipt-footer {
+      margin-top: 36px;
+      padding-top: 20px;
+      border-top: 1px dashed #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      font-size: 11.5px;
+      color: #64748b;
+    }
+    .signatory {
+      text-align: center;
+      border-top: 1px solid #94a3b8;
+      width: 180px;
+      padding-top: 4px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    /* PRINT MEDIA QUERY */
+    @media print {
+      body * {
+        visibility: hidden !important;
+      }
+      #invoiceSlipModal,
+      #printableSlipContent,
+      #printableSlipContent * {
+        visibility: visible !important;
+      }
+      #invoiceSlipModal {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      .receipt-modal-box {
+        box-shadow: none !important;
+        border: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      .modal-header, .modal-footer {
+        display: none !important;
+      }
+      .printable-invoice {
+        padding: 0 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP NAVBAR -->
+  <header class="navbar">
+    <a href="/billing" class="brand-group">
+      <div class="brand-icon">🏥</div>
+      <div class="brand-text">
+        <h1>Care<span>Plus</span></h1>
+        <p>Billing & Revenue Portal</p>
+      </div>
+    </a>
+    <div class="nav-actions">
+      <a href="/doctor_dashboard" class="btn btn-outline">🩺 Doctor Portal</a>
+      <a href="/patient_dashboard" class="btn btn-outline">🧑 Patient Portal</a>
+      <button onclick="openCreateInvoiceModal()" class="btn btn-primary">+ New Custom Bill</button>
+      <button onclick="confirmAndLogout()" class="btn btn-outline" style="color:var(--rose)">⏻ Logout</button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="container">
+    
+    <!-- HEADER ROW -->
+    <div class="header-row">
+      <div class="header-info">
+        <h2>💳 Hospital Billing & Invoices</h2>
+        <p>Manage consultation charges, pharmacy billing, payment collections, and printable slips.</p>
+      </div>
+      <div>
+        <button onclick="loadInvoices()" class="btn btn-outline">🔄 Refresh Data</button>
+      </div>
+    </div>
+
+    <!-- STATS / KPI GRID -->
+    <section class="kpi-grid">
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-top">
+          <span>Total Billed</span>
+          <span class="kpi-icon">💵</span>
+        </div>
+        <div class="kpi-value" id="kpiBilled">₹0.00</div>
+        <div class="kpi-sub">Across all generated hospital bills</div>
+      </div>
+
+      <div class="kpi-card kpi-green">
+        <div class="kpi-top">
+          <span>Total Collected</span>
+          <span class="kpi-icon">💳</span>
+        </div>
+        <div class="kpi-value" id="kpiCollected">₹0.00</div>
+        <div class="kpi-sub"><span id="kpiPaidCount">0</span> invoices fully settled</div>
+      </div>
+
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-top">
+          <span>Outstanding Balance</span>
+          <span class="kpi-icon">⏳</span>
+        </div>
+        <div class="kpi-value" id="kpiOutstanding">₹0.00</div>
+        <div class="kpi-sub"><span id="kpiUnpaidCount">0</span> unpaid / pending bills</div>
+      </div>
+
+      <div class="kpi-card kpi-purple">
+        <div class="kpi-top">
+          <span>Total Invoices</span>
+          <span class="kpi-icon">📊</span>
+        </div>
+        <div class="kpi-value" id="kpiTotalInvoices">0</div>
+        <div class="kpi-sub">Real-time synced records</div>
+      </div>
+    </section>
+
+    <!-- CONTROLS & FILTER BAR -->
+    <div class="controls-card">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search by patient name, phone, or INV-XXXXX…" oninput="filterInvoicesLocally()" />
+      </div>
+
+      <div class="filter-pills">
+        <button class="pill active" onclick="setStatusFilter('All', this)">All</button>
+        <button class="pill" onclick="setStatusFilter('Unpaid', this)">Unpaid</button>
+        <button class="pill" onclick="setStatusFilter('Partially Paid', this)">Partially Paid</button>
+        <button class="pill" onclick="setStatusFilter('Paid', this)">Paid</button>
+        <button class="pill" onclick="setStatusFilter('Cancelled', this)">Cancelled</button>
+      </div>
+
+      <div class="date-filter-group">
+        <input type="date" id="dateFilterFrom" onchange="loadInvoices()" title="From Date" />
+        <span style="color:var(--text-dark)">to</span>
+        <input type="date" id="dateFilterTo" onchange="loadInvoices()" title="To Date" />
+      </div>
+    </div>
+
+    <!-- INVOICES TABLE -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice ID</th>
+            <th>Date</th>
+            <th>Patient Details</th>
+            <th>Attending Doctor</th>
+            <th>Grand Total</th>
+            <th>Paid / Outstanding</th>
+            <th>Status</th>
+            <th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="invoicesTableBody">
+          <tr>
+            <td colspan="8" class="state-message">
+              <div class="icon">⏳</div>
+              <p>Loading invoices from database…</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- ========================================================= -->
+  <!-- 1. COLLECT PAYMENT MODAL                                  -->
+  <!-- ========================================================= -->
+  <div class="modal-backdrop" id="paymentModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="paymentModalTitle">Collect Payment</h3>
+        <button class="btn-close" onclick="closeModal('paymentModal')">&times;</button>
+      </div>
+      <form id="paymentForm" onsubmit="handlePaymentSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="payInvoiceId" />
+
+          <div class="due-callout">
+            <div>
+              <div class="label">Balance Due</div>
+              <div style="font-size:12px;color:var(--text-muted);" id="payPatientInfo">Patient: -</div>
+            </div>
+            <div class="amount" id="payDueAmount">₹0.00</div>
+          </div>
+
+          <div class="form-group">
+            <label>Payment Amount (₹) *</label>
+            <input type="number" step="0.01" min="1" id="payAmountInput" class="form-control" required />
+          </div>
+
+          <div class="form-group">
+            <label>Payment Method *</label>
+            <select id="payMethodInput" class="form-control" required>
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI / QR Code</option>
+              <option value="Card">Debit / Credit Card</option>
+              <option value="Insurance">Health Insurance Claim</option>
+              <option value="Bank Transfer">Bank Transfer / NEFT</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Transaction Reference / Auth Code</label>
+            <input type="text" id="payRefInput" class="form-control" placeholder="e.g. UPI/12345678 or Card Txn Ref" />
+          </div>
+
+          <div class="form-group">
+            <label>Notes / Remarks</label>
+            <input type="text" id="payNotesInput" class="form-control" placeholder="Optional settlement notes" />
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('paymentModal')">Cancel</button>
+          <button type="submit" class="btn btn-success" id="paySubmitBtn">Confirm & Record Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 2. VIEW / PRINT INVOICE SLIP MODAL                        -->
+  <!-- ========================================================= -->
+  <div class="modal-backdrop" id="invoiceSlipModal">
+    <div class="modal-box receipt-modal-box">
+      <div class="modal-header" style="background:#f8fafc; border-bottom:1px solid #e2e8f0;">
+        <h3 style="color:#0f172a; font-size:16px;">Hospital Invoice Preview</h3>
+        <button class="btn-close" style="color:#64748b;" onclick="closeModal('invoiceSlipModal')">&times;</button>
+      </div>
+      
+      <div class="modal-body" style="padding:0; background:#fff;">
+        <div class="printable-invoice" id="printableSlipContent">
+          <!-- Dynamically populated receipt content -->
+        </div>
+      </div>
+
+      <div class="modal-footer" style="background:#f8fafc; border-top:1px solid #e2e8f0;">
+        <button type="button" class="btn btn-outline" style="color:#334155; border-color:#cbd5e1" onclick="closeModal('invoiceSlipModal')">Close</button>
+        <button type="button" class="btn btn-primary" onclick="window.print()">🖨️ Print Slip (Ctrl + P)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 3. CREATE MANUAL CUSTOM INVOICE MODAL                     -->
+  <!-- ========================================================= -->
+  <div class="modal-backdrop" id="customInvoiceModal">
+    <div class="modal-box" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3>Create Hospital Invoice</h3>
+        <button class="btn-close" onclick="closeModal('customInvoiceModal')">&times;</button>
+      </div>
+      <form id="customInvoiceForm" onsubmit="handleCustomInvoiceSubmit(event)">
+        <div class="modal-body">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="form-group">
+              <label>Patient *</label>
+              <select id="custPatientSelect" class="form-control" required>
+                <option value="">-- Choose Patient --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Doctor (Optional)</label>
+              <select id="custDoctorSelect" class="form-control">
+                <option value="">-- Choose Doctor --</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin: 16px 0 10px; display:flex; justify-content:space-between; align-items:center;">
+            <label style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Line Items *</label>
+            <button type="button" class="btn btn-outline" style="padding:4px 10px; font-size:11px;" onclick="addCustomItemRow()">+ Add Item</button>
+          </div>
+
+          <div id="customItemsContainer">
+            <!-- Dynamic rows will be injected here -->
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
+            <div class="form-group">
+              <label>Discount Amount (₹)</label>
+              <input type="number" step="0.01" min="0" value="0" id="custDiscountInput" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label>Tax GST (%)</label>
+              <input type="number" step="0.01" min="0" value="0" id="custTaxInput" class="form-control" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Remarks / Clinical Reason</label>
+            <input type="text" id="custRemarksInput" class="form-control" placeholder="e.g. Routine OPD Consultation & Pharmacy" />
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('customInvoiceModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="custSubmitBtn">Generate Invoice</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    let allInvoices = [];
+    let currentStatusFilter = 'All';
+
+    // ─────────────────────────────────────────────
+    // 1. Load Invoices & Metrics from API
+    // ─────────────────────────────────────────────
+    async function loadInvoices() {
+      const fromDate = document.getElementById('dateFilterFrom').value;
+      const toDate = document.getElementById('dateFilterTo').value;
+
+      let url = `/api/method/hospital_management.api.get_invoices?status=${encodeURIComponent(currentStatusFilter)}`;
+      if (fromDate) url += `&from_date=${encodeURIComponent(fromDate)}`;
+      if (toDate) url += `&to_date=${encodeURIComponent(toDate)}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.message && data.message.status === 'success') {
+          allInvoices = data.message.invoices || [];
+          updateKPIs(data.message.metrics);
+          renderInvoicesTable(allInvoices);
+        } else {
+          document.getElementById('invoicesTableBody').innerHTML = `
+            <tr><td colspan="8" class="state-message"><div class="icon">⚠️</div><p>${data.message ? data.message.message : 'Error loading invoices'}</p></td></tr>
+          `;
+        }
+      } catch (err) {
+        console.error('Error fetching invoices:', err);
+        document.getElementById('invoicesTableBody').innerHTML = `
+          <tr><td colspan="8" class="state-message"><div class="icon">⚠️</div><p>Failed to connect to billing server.</p></td></tr>
+        `;
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // 2. Update KPI Metrics Bar
+    // ─────────────────────────────────────────────
+    function updateKPIs(metrics) {
+      if (!metrics) return;
+      document.getElementById('kpiBilled').textContent = '₹' + (metrics.total_billed || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById('kpiCollected').textContent = '₹' + (metrics.total_collected || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById('kpiOutstanding').textContent = '₹' + (metrics.total_outstanding || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      
+      const counts = metrics.counts || {};
+      document.getElementById('kpiTotalInvoices').textContent = counts.total || 0;
+      document.getElementById('kpiPaidCount').textContent = counts.paid || 0;
+      document.getElementById('kpiUnpaidCount').textContent = (counts.unpaid || 0) + (counts.partially_paid || 0);
+    }
+
+    // ─────────────────────────────────────────────
+    // 3. Render Invoices Table
+    // ─────────────────────────────────────────────
+    function renderInvoicesTable(invoices) {
+      const tbody = document.getElementById('invoicesTableBody');
+      if (!invoices || invoices.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="state-message">
+              <div class="icon">📑</div>
+              <p>No invoices found matching criteria.</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = invoices.map(inv => {
+        const grand = Number(inv.grand_total || inv.total_amount || 0);
+        const paid = Number(inv.paid_amount || 0);
+        const outstanding = Number(inv.outstanding_amount !== undefined ? inv.outstanding_amount : Math.max(0, grand - paid));
+        const status = inv.payment_status || 'Unpaid';
+
+        let badgeClass = 'badge-unpaid';
+        if (status === 'Paid') badgeClass = 'badge-paid';
+        else if (status === 'Partially Paid') badgeClass = 'badge-partially-paid';
+        else if (status === 'Cancelled') badgeClass = 'badge-cancelled';
+
+        const canPay = (status === 'Unpaid' || status === 'Partially Paid') && outstanding > 0;
+
+        return `
+          <tr>
+            <td>
+              <span class="invoice-id-badge">${inv.name}</span>
+            </td>
+            <td>
+              <div style="font-weight:500;">${inv.invoice_date || '-'}</div>
+            </td>
+            <td>
+              <div class="patient-cell">
+                <span class="patient-name">${escapeHtml(inv.patient_name || inv.patient)}</span>
+                <span class="patient-sub">${inv.patient_phone ? '📞 ' + inv.patient_phone : 'ID: ' + inv.patient}</span>
+              </div>
+            </td>
+            <td>
+              <div class="doctor-cell">${escapeHtml(inv.doctor_name || inv.doctor || 'Attending Physician')}</div>
+            </td>
+            <td>
+              <div class="amount-cell">₹${grand.toFixed(2)}</div>
+            </td>
+            <td>
+              <div>₹${paid.toFixed(2)}</div>
+              ${outstanding > 0 ? `<div class="balance-due">Due: ₹${outstanding.toFixed(2)}</div>` : ''}
+            </td>
+            <td>
+              <span class="badge ${badgeClass}">
+                <span class="badge-dot"></span>
+                ${status}
+              </span>
+            </td>
+            <td style="text-align:right">
+              <div class="actions-cell" style="justify-content:flex-end;">
+                ${canPay ? `
+                  <button class="btn-action btn-action-pay" onclick="openPaymentModal('${inv.name}', '${escapeHtml(inv.patient_name || inv.patient)}', ${outstanding})">
+                    💳 Collect
+                  </button>
+                ` : ''}
+                <button class="btn-action" onclick="viewInvoiceSlip('${inv.name}')" title="Print Invoice Slip">
+                  📄 Slip
+                </button>
+                ${status !== 'Cancelled' ? `
+                  <button class="btn-action" style="color:var(--rose)" onclick="cancelInvoicePrompt('${inv.name}')" title="Cancel Invoice">
+                    ❌
+                  </button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ─────────────────────────────────────────────
+    // 4. Local Search & Status Filter
+    // ─────────────────────────────────────────────
+    function setStatusFilter(status, btn) {
+      currentStatusFilter = status;
+      document.querySelectorAll('.filter-pills .pill').forEach(p => p.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      loadInvoices();
+    }
+
+    function filterInvoicesLocally() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      if (!q) {
+        renderInvoicesTable(allInvoices);
+        return;
+      }
+      const filtered = allInvoices.filter(inv => {
+        return (inv.name && inv.name.toLowerCase().includes(q)) ||
+               (inv.patient_name && inv.patient_name.toLowerCase().includes(q)) ||
+               (inv.patient && inv.patient.toLowerCase().includes(q)) ||
+               (inv.doctor_name && inv.doctor_name.toLowerCase().includes(q));
+      });
+      renderInvoicesTable(filtered);
+    }
+
+    // ─────────────────────────────────────────────
+    // 5. Collect Payment Modal & Handler
+    // ─────────────────────────────────────────────
+    function openPaymentModal(invoiceId, patientName, balanceDue) {
+      document.getElementById('payInvoiceId').value = invoiceId;
+      document.getElementById('paymentModalTitle').textContent = `Collect Payment - ${invoiceId}`;
+      document.getElementById('payPatientInfo').textContent = `Patient: ${patientName}`;
+      document.getElementById('payDueAmount').textContent = `₹${balanceDue.toFixed(2)}`;
+      document.getElementById('payAmountInput').value = balanceDue.toFixed(2);
+      document.getElementById('payAmountInput').max = balanceDue;
+      document.getElementById('payRefInput').value = '';
+      document.getElementById('payNotesInput').value = '';
+      openModal('paymentModal');
+    }
+
+    async function handlePaymentSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('paySubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Processing…';
+
+      const invoiceId = document.getElementById('payInvoiceId').value;
+      const amount = parseFloat(document.getElementById('payAmountInput').value);
+      const method = document.getElementById('payMethodInput').value;
+      const ref = document.getElementById('payRefInput').value.trim();
+      const notes = document.getElementById('payNotesInput').value.trim();
+
+      try {
+        const res = await fetch('/api/method/hospital_management.api.record_invoice_payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            invoice_id: invoiceId,
+            amount_paid: amount,
+            payment_method: method,
+            transaction_reference: ref,
+            notes: notes
+          })
+        });
+
+        const data = await res.json();
+        if (data.message && data.message.status === 'success') {
+          closeModal('paymentModal');
+          loadInvoices();
+          // Prompt user to view & print the updated receipt
+          if (confirm('✅ Payment recorded successfully! Would you like to view and print the invoice slip now?')) {
+            viewInvoiceSlip(invoiceId);
+          }
+        } else {
+          alert('Payment Failed: ' + ((data.message && data.message.message) || 'Error recording payment'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Network error while processing payment.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Confirm & Record Payment';
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // 6. View & Print Hospital Slip
+    // ─────────────────────────────────────────────
+    async function viewInvoiceSlip(invoiceId) {
+      const container = document.getElementById('printableSlipContent');
+      container.innerHTML = '<div style="text-align:center; padding:40px; color:#64748b;">Loading invoice details…</div>';
+      openModal('invoiceSlipModal');
+
+      try {
+        const res = await fetch(`/api/method/hospital_management.api.get_invoice_details?invoice_id=${encodeURIComponent(invoiceId)}`);
+        const data = await res.json();
+
+        if (data.message && data.message.status === 'success') {
+          const inv = data.message.invoice;
+          const pat = inv.patient_details || {};
+          const doc = inv.doctor_details || {};
+          const items = inv.items || [];
+          const status = inv.payment_status || 'Unpaid';
+          const isPaid = status === 'Paid';
+
+          const grand = Number(inv.grand_total || inv.total_amount || 0);
+          const paid = Number(inv.paid_amount || 0);
+          const balance = Number(inv.outstanding_amount !== undefined ? inv.outstanding_amount : Math.max(0, grand - paid));
+
+          let itemsRows = items.map((it, idx) => `
+            <tr>
+              <td class="text-center">${idx + 1}</td>
+              <td><strong>${escapeHtml(it.item_name || 'Medical Service')}</strong></td>
+              <td class="text-center"><span style="font-size:11px; background:#f1f5f9; padding:2px 8px; border-radius:4px;">${escapeHtml(it.item_type || 'General')}</span></td>
+              <td class="text-center">${it.quantity || 1}</td>
+              <td class="text-right">₹${Number(it.unit_price || 0).toFixed(2)}</td>
+              <td class="text-right"><strong>₹${Number(it.amount || 0).toFixed(2)}</strong></td>
+            </tr>
+          `).join('');
+
+          if (items.length === 0) {
+            itemsRows = `<tr><td colspan="6" class="text-center" style="padding:16px; color:#64748b;">Consultation / Standard Medical Service Charge</td></tr>`;
+          }
+
+          container.innerHTML = `
+            <div class="hospital-header">
+              <div class="hosp-brand">
+                <h2>🏥 CarePlus Multispeciality Hospital</h2>
+                <p>
+                  742 Healthcare Boulevard, Anna Nagar, Chennai - 600040<br>
+                  Tel: +91 44 2847 9000 | 24/7 Helpline: 1800-425-CARE<br>
+                  GSTIN: 33AAAAA0000A1Z5 | Reg No: TN-MED-2026-9921
+                </p>
+              </div>
+              <div class="bill-meta">
+                <div class="bill-title">Patient Bill / Receipt</div>
+                <p><strong>Invoice No:</strong> ${inv.name}</p>
+                <p><strong>Date:</strong> ${inv.invoice_date || '-'}</p>
+                ${inv.appointment ? `<p><strong>Appointment Ref:</strong> ${inv.appointment}</p>` : ''}
+                <span class="print-status-badge ${isPaid ? 'print-paid' : 'print-unpaid'}">
+                  ${status}
+                </span>
+              </div>
+            </div>
+
+            <div class="patient-doc-grid">
+              <div class="info-col">
+                <h4>Patient Information</h4>
+                <div class="name">${escapeHtml(pat.patient_name || inv.patient)}</div>
+                <p><strong>ID:</strong> ${inv.patient}</p>
+                <p><strong>Phone:</strong> ${pat.phone || 'N/A'} ${pat.gender ? `| <strong>Gender:</strong> ${pat.gender}` : ''}</p>
+                ${pat.blood_group ? `<p><strong>Blood Group:</strong> ${pat.blood_group}</p>` : ''}
+              </div>
+              <div class="info-col">
+                <h4>Attending Physician</h4>
+                <div class="name">Dr. ${escapeHtml(doc.doctor_name || inv.doctor || 'Hospital Physician')}</div>
+                <p><strong>Specialization:</strong> ${doc.specialization || 'General Healthcare'}</p>
+                <p><strong>Department:</strong> ${doc.department || 'Clinical Services'}</p>
+              </div>
+            </div>
+
+            <table class="print-table">
+              <thead>
+                <tr>
+                  <th class="text-center" style="width:45px">#</th>
+                  <th>Description / Services</th>
+                  <th class="text-center" style="width:110px">Category</th>
+                  <th class="text-center" style="width:60px">Qty</th>
+                  <th class="text-right" style="width:110px">Unit Price</th>
+                  <th class="text-right" style="width:120px">Total Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsRows}
+              </tbody>
+            </table>
+
+            <div class="summary-section">
+              <div class="payment-history-box">
+                <h4>Payment Information</h4>
+                <p><strong>Payment Method:</strong> ${inv.payment_method || 'Cash'}</p>
+                ${inv.transaction_reference ? `<p><strong>Ref / Txn ID:</strong> ${inv.transaction_reference}</p>` : ''}
+                ${inv.payment_date ? `<p><strong>Settled On:</strong> ${inv.payment_date}</p>` : ''}
+                ${inv.remarks ? `<p style="margin-top:4px;"><strong>Notes:</strong> ${escapeHtml(inv.remarks)}</p>` : ''}
+              </div>
+
+              <div class="totals-box">
+                <div class="totals-row">
+                  <span>Subtotal:</span>
+                  <span>₹${Number(inv.subtotal || grand).toFixed(2)}</span>
+                </div>
+                ${Number(inv.discount_amount || 0) > 0 ? `
+                  <div class="totals-row" style="color:#15803d;">
+                    <span>Discount:</span>
+                    <span>-₹${Number(inv.discount_amount).toFixed(2)}</span>
+                  </div>
+                ` : ''}
+                ${Number(inv.tax_amount || 0) > 0 ? `
+                  <div class="totals-row">
+                    <span>GST Tax (${inv.tax_percentage || 0}%):</span>
+                    <span>+₹${Number(inv.tax_amount).toFixed(2)}</span>
+                  </div>
+                ` : ''}
+                <div class="totals-row grand-total">
+                  <span>Grand Total:</span>
+                  <span>₹${grand.toFixed(2)}</span>
+                </div>
+                <div class="totals-row" style="color:#15803d; font-weight:600; margin-top:4px;">
+                  <span>Amount Paid:</span>
+                  <span>₹${paid.toFixed(2)}</span>
+                </div>
+                ${balance > 0 ? `
+                  <div class="totals-row balance">
+                    <span>Balance Due:</span>
+                    <span>₹${balance.toFixed(2)}</span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+
+            <div class="receipt-footer">
+              <div>
+                <p>Thank you for choosing CarePlus Hospital. Wishing you speedy health & wellness!</p>
+                <p style="font-size:10px; margin-top:2px;">This is a computer-generated tax invoice verified by Frappe ERP backend.</p>
+              </div>
+              <div class="signatory">
+                Authorized Cashier / Officer
+              </div>
+            </div>
+          `;
+        } else {
+          container.innerHTML = `<div style="text-align:center; padding:30px; color:#b91c1c;">Could not load details for ${invoiceId}</div>`;
+        }
+      } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div style="text-align:center; padding:30px; color:#b91c1c;">Failed to load invoice receipt.</div>`;
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // 7. Cancel Invoice Prompt
+    // ─────────────────────────────────────────────
+    async function cancelInvoicePrompt(invoiceId) {
+      const reason = prompt(`Are you sure you want to cancel invoice ${invoiceId}?
+Please enter reason for cancellation:`, 'Patient cancelled appointment');
+      if (reason === null) return;
+
+      try {
+        const res = await fetch('/api/method/hospital_management.api.cancel_invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoice_id: invoiceId, reason: reason })
+        });
+        const data = await res.json();
+        if (data.message && data.message.status === 'success') {
+          alert(`Invoice ${invoiceId} cancelled.`);
+          loadInvoices();
+        } else {
+          alert('Cancel failed: ' + ((data.message && data.message.message) || 'Error'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error cancelling invoice.');
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // 8. Custom Ad-Hoc Invoice Modal
+    // ─────────────────────────────────────────────
+    let customItemIndex = 0;
+    let availableMedicines = [];
+
+    async function openCreateInvoiceModal() {
+      // Load patients and doctors
+      try {
+        const pRes = await fetch('/api/method/frappe.client.get_list?doctype=Patient&fields=["name","patient_name"]&limit_page_length=100');
+        const pData = await pRes.json();
+        const pSelect = document.getElementById('custPatientSelect');
+        pSelect.innerHTML = '<option value="">-- Choose Patient --</option>';
+        (pData.message || []).forEach(p => {
+          pSelect.innerHTML += `<option value="${p.name}">${escapeHtml(p.patient_name || p.name)} (${p.name})</option>`;
+        });
+
+        const dRes = await fetch('/api/method/hospital_management.api.get_doctors_list');
+        const dData = await dRes.json();
+        const dSelect = document.getElementById('custDoctorSelect');
+        dSelect.innerHTML = '<option value="">-- Choose Doctor (Optional) --</option>';
+        (dData.message || []).forEach(d => {
+          dSelect.innerHTML += `<option value="${d.name}">Dr. ${escapeHtml(d.doctor_name || d.name)} - Fee: ₹${d.consultation_fee || 0}</option>`;
+        });
+
+        const mRes = await fetch('/api/method/hospital_management.api.get_medicines_list');
+        const mData = await mRes.json();
+        availableMedicines = mData.message || [];
+      } catch (e) {
+        console.error('Error loading dropdowns:', e);
+      }
+
+      document.getElementById('customItemsContainer').innerHTML = '';
+      customItemIndex = 0;
+      addCustomItemRow('Consultation', 'Doctor Consultation Charge', 1, 500);
+      openModal('customInvoiceModal');
+    }
+
+    function addCustomItemRow(type='Service', name='', qty=1, price=0) {
+      customItemIndex++;
+      const id = customItemIndex;
+      const row = document.createElement('div');
+      row.className = 'custom-item-row';
+      row.id = `custItemRow_${id}`;
+      row.style = 'display:grid; grid-template-columns:120px 1fr 70px 100px 30px; gap:8px; margin-bottom:8px; align-items:center;';
+      row.innerHTML = `
+        <select class="form-control" style="padding:8px;" id="itemType_${id}" onchange="handleItemTypeChange(${id})">
+          <option value="Consultation" ${type==='Consultation'?'selected':''}>Consultation</option>
+          <option value="Medicine" ${type==='Medicine'?'selected':''}>Medicine</option>
+          <option value="Procedure" ${type==='Procedure'?'selected':''}>Procedure</option>
+          <option value="Service" ${type==='Service'?'selected':''}>Service</option>
+          <option value="Other" ${type==='Other'?'selected':''}>Other</option>
+        </select>
+        <input type="text" class="form-control" style="padding:8px;" id="itemName_${id}" placeholder="Item description" value="${escapeHtml(name)}" required />
+        <input type="number" min="1" step="1" class="form-control" style="padding:8px;" id="itemQty_${id}" value="${qty}" required />
+        <input type="number" min="0" step="0.01" class="form-control" style="padding:8px;" id="itemPrice_${id}" value="${price}" required />
+        <button type="button" style="background:transparent; border:none; color:var(--rose); font-size:16px; cursor:pointer;" onclick="removeCustomItemRow(${id})">&times;</button>
+      `;
+      document.getElementById('customItemsContainer').appendChild(row);
+    }
+
+    function removeCustomItemRow(id) {
+      const el = document.getElementById(`custItemRow_${id}`);
+      if (el) el.remove();
+    }
+
+    function handleItemTypeChange(id) {
+      const t = document.getElementById(`itemType_${id}`).value;
+      const nameInput = document.getElementById(`itemName_${id}`);
+      const priceInput = document.getElementById(`itemPrice_${id}`);
+      if (t === 'Consultation') {
+        nameInput.value = 'General Consultation Fee';
+        priceInput.value = 500;
+      } else if (t === 'Medicine' && availableMedicines.length > 0) {
+        nameInput.value = availableMedicines[0].medicine_name || availableMedicines[0].name;
+        priceInput.value = availableMedicines[0].price || 20;
+      }
+    }
+
+    async function handleCustomInvoiceSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('custSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Generating…';
+
+      const patient = document.getElementById('custPatientSelect').value;
+      const doctor = document.getElementById('custDoctorSelect').value;
+      const discount = parseFloat(document.getElementById('custDiscountInput').value) || 0;
+      const tax = parseFloat(document.getElementById('custTaxInput').value) || 0;
+      const remarks = document.getElementById('custRemarksInput').value.trim();
+
+      const itemRows = document.querySelectorAll('#customItemsContainer .custom-item-row');
+      const items = [];
+      itemRows.forEach(r => {
+        const id = r.id.split('_')[1];
+        const type = document.getElementById(`itemType_${id}`).value;
+        const name = document.getElementById(`itemName_${id}`).value;
+        const qty = parseFloat(document.getElementById(`itemQty_${id}`).value) || 1;
+        const price = parseFloat(document.getElementById(`itemPrice_${id}`).value) || 0;
+        items.push({ item_type: type, item_name: name, quantity: qty, unit_price: price });
+      });
+
+      if (items.length === 0) {
+        alert('Please add at least one line item.');
+        btn.disabled = false;
+        btn.textContent = 'Generate Invoice';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/method/hospital_management.api.create_custom_invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patient: patient,
+            doctor: doctor || null,
+            items: items,
+            discount_amount: discount,
+            tax_percentage: tax,
+            remarks: remarks
+          })
+        });
+
+        const data = await res.json();
+        if (data.message && data.message.status === 'success') {
+          closeModal('customInvoiceModal');
+          loadInvoices();
+          alert(`✅ Invoice ${data.message.invoice_id} created successfully!`);
+          viewInvoiceSlip(data.message.invoice_id);
+        } else {
+          alert('Creation Failed: ' + ((data.message && data.message.message) || 'Error'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Network error while creating invoice.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Invoice';
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // 9. Helpers & Modal Controls
+    // ─────────────────────────────────────────────
+    function openModal(id) {
+      const m = document.getElementById(id);
+      if (m) m.style.display = 'flex';
+    }
+    function closeModal(id) {
+      const m = document.getElementById(id);
+      if (m) m.style.display = 'none';
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    async function confirmAndLogout() {
+      if (confirm('Are you sure you want to sign out?')) {
+        try {
+          await fetch('/api/method/hospital_management.api.logout', { method: 'POST' });
+        } catch (e) {}
+        window.location.replace('/frontend');
+      }
+    }
+
+    // Auto load on init
+    loadInvoices();
+  </script>
+</body>
+</html>
