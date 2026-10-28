@@ -639,20 +639,24 @@
       const qrData = encodeURIComponent(window.location.origin + `/prescription_slip?name=${rxNumber}`);
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=0&data=${qrData}`;
 
-      let medRows = meds.map((m, idx) => `
+      let medRows = meds.map((m, idx) => {
+        const timingStr = m.timing ? `<span style="display:inline-block; font-size:11px; font-weight:600; color:#0284c7; background:#e0f2fe; padding:1px 6px; border-radius:4px; margin-right:4px;">${escapeHtml(m.timing)}</span>` : '';
+        const instructStr = (m.instructions && m.instructions !== m.timing) ? escapeHtml(m.instructions) : (m.timing ? '' : 'As directed');
+        return `
         <tr>
           <td class="text-center" style="font-weight:700; width:40px">${idx + 1}</td>
           <td>
             <div class="medicine-primary">${escapeHtml(m.medicine_name)}</div>
-            <div class="medicine-instruct">${escapeHtml(m.instructions || 'After meals')}</div>
+            <div class="medicine-instruct">${timingStr}${instructStr}</div>
           </td>
           <td class="text-center">
             <span class="badge-dose">${escapeHtml(m.dosage || '1 tablet')}</span>
+            ${m.quantity ? `<div style="font-size:11px; font-weight:600; color:#475569; margin-top:3px;">Qty: ${m.quantity}</div>` : ''}
           </td>
           <td class="text-center">${escapeHtml(m.frequency || 'Once Daily')}</td>
           <td class="text-center">${escapeHtml(m.duration || '5 days')}</td>
-        </tr>
-      `).join('');
+        </tr>`;
+      }).join('');
 
       if (meds.length === 0) {
         medRows = `<tr><td colspan="5" class="text-center" style="padding:20px; color:#64748b;">No active prescription medications recorded.</td></tr>`;

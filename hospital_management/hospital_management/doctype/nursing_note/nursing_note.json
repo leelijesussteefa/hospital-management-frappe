@@ -1,0 +1,112 @@
+{
+ "actions": [],
+ "autoname": "naming_series:NN-.#####",
+ "creation": "2026-10-23 11:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "patient",
+  "nurse",
+  "appointment",
+  "column_break_nn",
+  "note_date_time",
+  "care_status",
+  "observations_section",
+  "observations",
+  "handover_notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "NN-.#####"
+  },
+  {
+   "fieldname": "patient",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Patient",
+   "options": "Patient",
+   "reqd": 1
+  },
+  {
+   "fieldname": "nurse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Nurse",
+   "options": "Nurse"
+  },
+  {
+   "fieldname": "appointment",
+   "fieldtype": "Link",
+   "label": "Linked Appointment",
+   "options": "Appointments"
+  },
+  {
+   "fieldname": "column_break_nn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "note_date_time",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Note Date & Time"
+  },
+  {
+   "default": "Routine",
+   "fieldname": "care_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Patient Care Status",
+   "options": "Routine\nObservation\nCritical\nStable\nDischarged"
+  },
+  {
+   "fieldname": "observations_section",
+   "fieldtype": "Section Break",
+   "label": "Clinical Observations & Handover"
+  },
+  {
+   "fieldname": "observations",
+   "fieldtype": "Small Text",
+   "label": "Care Notes & Observations"
+  },
+  {
+   "fieldname": "handover_notes",
+   "fieldtype": "Small Text",
+   "label": "Shift Handover Notes"
+  }
+ ],
+ "modified": "2026-10-23 11:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hospital Management",
+ "name": "Nursing Note",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "Hospital Administrator",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Nurse",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Doctor"
+  }
+ ]
+}

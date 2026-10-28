@@ -58,11 +58,29 @@ app_license = "mit"
 
 # application home page (will override Website Settings)
 # home_page = "login"
+# website_user_home_page = "desk"
 
 # website user home page (by Role)
-# role_home_page = {
-# 	"Role": "home_page"
-# }
+# Native Frappe login (/login) strictly routes users to standard Frappe Desk (/app or /desk).
+# Custom role portals are handled exclusively inside unified_login.
+# role_home_page = {}
+
+# Website Route Rules
+# --------------------
+# Route rules for custom portal pages.
+# Standard Frappe paths (/login, /app, /desk) are never overridden
+# so native Frappe authentication and desk routes remain functional.
+website_route_rules = [
+    {"from_route": "/billing", "to_route": "billing"},
+]
+
+# Website Redirects
+# -----------------
+# Keep native Frappe routes intact; redirect root to native Frappe login.
+website_redirects = [
+    {"source": r"/$", "target": "/login"},
+]
+
 
 # Generators
 # ----------
@@ -206,7 +224,7 @@ app_license = "mit"
 # Request Events
 # ----------------
 # before_request = ["hospital_management.utils.before_request"]
-# after_request = ["hospital_management.utils.after_request"]
+after_request = ["hospital_management.api.set_portal_cache_headers"]
 
 # Job Events
 # ----------

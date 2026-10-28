@@ -1,0 +1,99 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:nurse_name",
+ "creation": "2026-10-23 11:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "nurse_name",
+  "user_id",
+  "department",
+  "shift",
+  "column_break_nurse",
+  "phone",
+  "email",
+  "is_active"
+ ],
+ "fields": [
+  {
+   "fieldname": "nurse_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Nurse Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "user_id",
+   "fieldtype": "Link",
+   "label": "Linked User Account",
+   "options": "User"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "Departments"
+  },
+  {
+   "default": "Morning",
+   "fieldname": "shift",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Shift",
+   "options": "Morning\nEvening\nNight"
+  },
+  {
+   "fieldname": "column_break_nurse",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Phone",
+   "label": "Phone Number"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email Address"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Active"
+  }
+ ],
+ "modified": "2026-10-23 11:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hospital Management",
+ "name": "Nurse",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "Hospital Administrator",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Doctor"
+  },
+  {
+   "read": 1,
+   "role": "Nurse"
+  }
+ ]
+}

@@ -17,7 +17,13 @@
   "frequency",
   "duration",
   "instructions",
-  "naming_series"
+  "naming_series",
+  "dispense_status",
+  "invoice_reference",
+  "diagnosis_notes",
+  "items_section",
+  "items",
+  "authorization_status"
  ],
  "fields": [
   {
@@ -63,7 +69,7 @@
    "fieldname": "frequency",
    "fieldtype": "Select",
    "label": "Frequency",
-   "options": "Once Daily\nTwice Daily\nThrice Daily\nAs Needed"
+   "options": "1-0-1\n1-1-1\n1-0-0\n0-0-1\nOnce Daily\nTwice Daily\nThrice Daily\nFour Times Daily\nAs Needed"
   },
   {
    "fieldname": "duration",
@@ -80,12 +86,50 @@
    "fieldtype": "Select",
    "label": "Naming Series",
    "options": "PRE-.#####"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "dispense_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Dispense Status",
+   "options": "Pending\nDispensed\nCancelled"
+  },
+  {
+   "fieldname": "invoice_reference",
+   "fieldtype": "Link",
+   "label": "Invoice Reference",
+   "options": "Invoice"
+  },
+  {
+   "fieldname": "diagnosis_notes",
+   "fieldtype": "Small Text",
+   "label": "Diagnosis / Clinical Notes"
+  },
+  {
+   "fieldname": "items_section",
+   "fieldtype": "Section Break",
+   "label": "Prescribed Medications"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Prescription Items",
+   "options": "Prescription Item"
+  },
+  {
+   "fieldname": "authorization_status",
+   "fieldtype": "Select",
+   "label": "Authorization Status",
+   "options": "Draft\nAuthorized\nCancelled",
+   "default": "Authorized",
+   "in_list_view": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-13 18:44:17.445468",
+ "modified": "2026-10-23 11:15:00.000000",
  "modified_by": "Administrator",
  "module": "Hospital Management",
  "name": "Prescription",
@@ -93,16 +137,54 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
-   "email": 1,
    "export": 1,
    "print": 1,
+   "report": 1
+  },
+  {
+   "role": "Hospital Administrator",
    "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1
+  },
+  {
+   "role": "Doctor",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 0,
+   "print": 1
+  },
+  {
+   "role": "Pharmacy Staff",
+   "read": 1,
+   "write": 1,
+   "create": 0,
+   "delete": 0,
+   "print": 1
+  },
+  {
+   "role": "Nurse",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0
+  },
+  {
+   "role": "Patient",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0
   }
  ],
  "row_format": "Dynamic",

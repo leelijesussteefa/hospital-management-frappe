@@ -1,0 +1,2029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title or "CarePlus | Pharmacy Desk & Dispense Management" }}</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <script>
+    (function initSessionGuard() {
+        // 1. Immediate server-rendered session validation
+        const sessionUser = "{{ frappe.session.user }}";
+        if (!sessionUser || sessionUser === "Guest") {
+            window.history.replaceState(null, document.title, '/frontend');
+            window.location.replace('/frontend');
+            return;
+        }
+
+        // Replace current state so back navigation cannot freely reopen authenticated dashboard pages without valid credentials
+        window.history.replaceState(null, document.title, window.location.href);
+
+        // 2. Client-side session verification against backend API
+        async function checkAuthSession() {
+            try {
+                const res = await fetch('/api/method/hospital_management.api.check_session', {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    },
+                    cache: 'no-store'
+                });
+                if (!res.ok) {
+                    window.history.replaceState(null, document.title, '/frontend');
+                    window.location.replace('/frontend');
+                    return;
+                }
+                const data = await res.json();
+                const info = (data && data.message) ? data.message : data;
+                if (!info || info.status === 'unauthenticated' || !info.user || info.user === 'Guest') {
+                    window.history.replaceState(null, document.title, '/frontend');
+                    window.location.replace('/frontend');
+                }
+            } catch (err) {
+                console.warn('Session verification error:', err);
+            }
+        }
+        window.checkAuthSession = checkAuthSession;
+
+        // 3. Initial page load validation
+        checkAuthSession();
+
+        // 4. Prevent Browser Back-Forward Cache (bfcache)
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                // If restored from back-forward cache, verify active session
+                checkAuthSession();
+            }
+        });
+
+        // 5. Enforce history lock and validate on popstate (back navigation)
+        function lockNavigation() {
+            window.history.pushState(null, document.title, window.location.href);
+        }
+        lockNavigation();
+
+        window.addEventListener('popstate', function (event) {
+            checkAuthSession();
+            lockNavigation();
+        });
+
+        // 6. Trap Backspace on non-input elements
+        window.addEventListener('keydown', function (e) {
+            if (e.key === 'Backspace' || e.keyCode === 8) {
+                const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+                const isEditable = document.activeElement && (
+                    document.activeElement.isContentEditable ||
+                    tag === 'input' ||
+                    tag === 'textarea' ||
+                    tag === 'select'
+                );
+                if (!isEditable) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }
+        }, true);
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #090d16;
+      --surface: #0f172a;
+      --surface2: #1e293b;
+      --surface3: #334155;
+      --border: #334155;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --indigo: #6366f1;
+      --emerald: #10b981;
+      --emerald-bg: rgba(16, 185, 129, 0.12);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.12);
+      --rose: #f43f5e;
+      --rose-bg: rgba(244, 63, 94, 0.12);
+      --purple: #a855f7;
+      --text: #f8fafc;
+      --text-dim: #94a3b8;
+      --text-dark: #64748b;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* TOP NAVBAR */
+    .navbar {
+      height: 70px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--emerald), var(--primary));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #fff;
+    }
+
+    .role-badge {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-link-btn {
+      text-decoration: none;
+      color: var(--text-dim);
+      font-size: 13px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-link-btn:hover {
+      color: var(--text);
+      border-color: var(--primary);
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    /* MAIN CONTAINER */
+    .container {
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      flex: 1;
+    }
+
+    /* KPI STATS */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .kpi-icon {
+      font-size: 24px;
+      margin-bottom: 12px;
+    }
+
+    .kpi-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+    }
+
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 800;
+      margin-top: 6px;
+      color: #fff;
+    }
+
+    /* CONTROLS BAR */
+    .controls-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 14px 18px;
+      border-radius: 12px;
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-pill.active, .filter-pill:hover {
+      background: var(--indigo);
+      color: #fff;
+      border-color: var(--indigo);
+    }
+
+    .search-box {
+      position: relative;
+      min-width: 280px;
+    }
+
+    .search-box input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 14px 9px 36px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: var(--primary);
+    }
+
+    .search-box span {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      font-size: 14px;
+    }
+
+    /* QUEUE CARDS */
+    .queue-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .rx-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .rx-card:hover {
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+
+    .rx-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .rx-patient-info {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .patient-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .patient-meta-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .patient-meta-name:hover {
+      color: var(--primary);
+    }
+
+    .patient-meta-details {
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      gap: 10px;
+      margin-top: 3px;
+    }
+
+    .rx-badge-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-status {
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-pending {
+      background: var(--amber-bg);
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-dispensed {
+      background: var(--emerald-bg);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .rx-number-tag {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-dim);
+      background: var(--surface2);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* MEDICINE ITEMS TABLE */
+    .meds-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-bottom: 16px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .meds-table th {
+      background: var(--surface2);
+      color: var(--text-dim);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 11px;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .meds-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(15, 23, 42, 0.4);
+    }
+
+    .stock-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 12px;
+    }
+
+    .stock-in {
+      background: var(--emerald-bg);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .stock-low {
+      background: var(--amber-bg);
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .stock-out {
+      background: var(--rose-bg);
+      color: var(--rose);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    /* FOOTER OF RX CARD */
+    .rx-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      padding-top: 10px;
+    }
+
+    .rx-totals {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .rx-total-val {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--emerald);
+    }
+
+    .rx-doctor-note {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    .btn-dispense {
+      background: linear-gradient(135deg, var(--emerald), #059669);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 22px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s;
+    }
+
+    .btn-dispense:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5);
+    }
+
+    .btn-dispense:disabled {
+      background: var(--surface3);
+      color: var(--text-dim);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-action-sm {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+
+    .btn-action-sm:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    /* INVENTORY DRAWER */
+    .drawer-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: none;
+    }
+
+    .drawer-backdrop.active { display: block; }
+
+    .drawer {
+      position: fixed;
+      top: 0; right: -650px;
+      width: 650px;
+      max-width: 95vw;
+      height: 100vh;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      z-index: 201;
+      transition: right 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .drawer.active { right: 0; }
+
+    .drawer-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .drawer-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    /* TOAST NOTIFICATION */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface2);
+      border: 1px solid var(--emerald);
+      color: #fff;
+      padding: 16px 20px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      z-index: 300;
+      display: none;
+      align-items: center;
+      gap: 12px;
+      font-size: 13.5px;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* + ADD MEDICINE GLOWING PRIMARY BUTTON */
+    .btn-add-medicine {
+      background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #041226;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+      white-space: nowrap;
+    }
+    .btn-add-medicine:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 24px rgba(56, 189, 248, 0.65), 0 4px 12px rgba(0, 0, 0, 0.4);
+      background: linear-gradient(135deg, #38bdf8, #7dd3fc);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* DARK GLASSMORPHIC MODAL STYLES */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 14, 26, 0.82);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: modalFadeIn 0.22s ease-out;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .modal-card {
+      width: min(560px, 94vw);
+      max-height: 90vh;
+      background: linear-gradient(135deg, rgba(20, 27, 45, 0.96), rgba(12, 18, 32, 0.98));
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 20px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(56, 189, 248, 0.2);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalSlideUp {
+      from { opacity: 0; transform: translateY(18px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);
+    }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.3px;
+      margin: 0;
+    }
+    .modal-desc {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin: 2px 0 0;
+    }
+    .modal-close-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-dim);
+      font-size: 16px;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    .modal-close-btn:hover {
+      background: rgba(244, 63, 94, 0.2);
+      color: #fb7185;
+      border-color: #fb7185;
+    }
+    .modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .form-row {
+      display: flex;
+      gap: 16px;
+    }
+    .form-row.two-col > .form-group {
+      flex: 1;
+    }
+    .form-group.full-width {
+      width: 100%;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 6px;
+      letter-spacing: 0.3px;
+    }
+    .form-group label .req { color: #fb7185; }
+    .form-group label .opt { font-size: 11px; color: var(--text-dim); font-weight: normal; }
+    .modal-card .form-control {
+      width: 100%;
+      height: 42px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 0 14px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+    }
+    .modal-card .form-control:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+      background: rgba(15, 23, 42, 0.98);
+    }
+    .form-hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      display: block;
+    }
+    .modal-alert {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .modal-alert.error {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+    }
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.5);
+    }
+    .btn-modal-cancel {
+      background: transparent;
+      border: 1px solid #334155;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-modal-cancel:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+    }
+    .btn-modal-submit {
+      background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #041226;
+      font-size: 13px;
+      font-weight: 800;
+      padding: 9px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+    }
+    .btn-modal-submit:hover {
+      box-shadow: 0 6px 20px rgba(56, 189, 248, 0.5);
+      transform: translateY(-1px);
+    }
+
+    /* CAREPLUS REUSABLE NOTIFICATION / CONFIRMATION MODAL & TOAST SYSTEM */
+    .careplus-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 14, 26, 0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: cpFadeIn 0.25s ease-out;
+    }
+    @keyframes cpFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .careplus-modal-card {
+      position: relative;
+      background: linear-gradient(145deg, rgba(20, 27, 45, 0.95), rgba(13, 19, 33, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(99, 102, 241, 0.18);
+      border-radius: 20px;
+      width: min(440px, 94vw);
+      padding: 32px 28px 24px;
+      text-align: center;
+      overflow: hidden;
+      animation: cpScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes cpScaleUp {
+      from { transform: scale(0.92) translateY(12px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .careplus-modal-glow {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 220px;
+      height: 60px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .careplus-modal-header-icon {
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.25));
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+    }
+    .careplus-modal-header-icon.danger {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(225, 29, 72, 0.3));
+      border-color: rgba(244, 63, 94, 0.45);
+      box-shadow: 0 8px 24px rgba(244, 63, 94, 0.35);
+    }
+    .careplus-modal-header-icon.success {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.3));
+      border-color: rgba(16, 185, 129, 0.45);
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+    }
+    .careplus-modal-title {
+      font-size: 19px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin: 0 0 8px;
+      letter-spacing: -0.3px;
+    }
+    .careplus-modal-desc {
+      font-size: 14px;
+      color: #cbd5e1;
+      line-height: 1.55;
+      margin: 0 0 6px;
+    }
+    .careplus-modal-subtext {
+      font-size: 12.5px;
+      color: #94a3b8;
+      line-height: 1.45;
+      margin: 0 0 24px;
+    }
+    .careplus-modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .careplus-btn-cancel {
+      flex: 1;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 600;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .careplus-btn-cancel:hover {
+      background: rgba(51, 65, 85, 0.9);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .careplus-btn-confirm {
+      flex: 1;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+      transition: all 0.2s ease;
+    }
+    .careplus-btn-confirm:hover {
+      background: linear-gradient(135deg, #818cf8, #6366f1);
+      box-shadow: 0 6px 22px rgba(99, 102, 241, 0.6);
+      transform: translateY(-1px);
+    }
+    .careplus-btn-confirm.danger {
+      background: linear-gradient(135deg, #f43f5e, #e11d48);
+      box-shadow: 0 4px 16px rgba(244, 63, 94, 0.4);
+    }
+    .careplus-btn-confirm.danger:hover {
+      background: linear-gradient(135deg, #fb7185, #f43f5e);
+      box-shadow: 0 6px 22px rgba(244, 63, 94, 0.6);
+    }
+    .careplus-btn-confirm.success {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+    }
+    .careplus-btn-confirm.success:hover {
+      background: linear-gradient(135deg, #34d399, #10b981);
+      box-shadow: 0 6px 22px rgba(16, 185, 129, 0.6);
+    }
+
+    /* TOP-RIGHT FLOATING TOAST NOTIFICATIONS */
+    .careplus-toast-container {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 10001;
+      pointer-events: none;
+    }
+    .careplus-toast {
+      pointer-events: auto;
+      min-width: 300px;
+      max-width: 420px;
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(99, 102, 241, 0.15);
+      border-radius: 14px;
+      padding: 14px 18px;
+      color: #fff;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      animation: cpToastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.3s ease;
+    }
+    @keyframes cpToastSlideIn {
+      from { transform: translateX(40px) scale(0.95); opacity: 0; }
+      to { transform: translateX(0) scale(1); opacity: 1; }
+    }
+    .careplus-toast-icon {
+      font-size: 20px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .careplus-toast-body {
+      flex: 1;
+    }
+    .careplus-toast-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 2px;
+    }
+    .careplus-toast-msg {
+      font-size: 12.5px;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+    .careplus-toast.success {
+      border-color: rgba(16, 185, 129, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(16, 185, 129, 0.2);
+    }
+    .careplus-toast.success .careplus-toast-title { color: #34d399; }
+    .careplus-toast.warning {
+      border-color: rgba(245, 158, 11, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(245, 158, 11, 0.2);
+    }
+    .careplus-toast.warning .careplus-toast-title { color: #fbbf24; }
+    .careplus-toast.error {
+      border-color: rgba(244, 63, 94, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(244, 63, 94, 0.2);
+    }
+    .careplus-toast.error .careplus-toast-title { color: #fda4af; }
+
+  </style>
+</head>
+<body>
+
+  <!-- TOP NAVBAR -->
+  <header class="navbar">
+    <div class="brand-section">
+      <div class="brand-logo">💊</div>
+      <div>
+        <div class="brand-title">CarePlus Clinic</div>
+        <div style="font-size:11px; color:var(--text-dim);">Central Pharmacy & Dispense System</div>
+      </div>
+      <span class="role-badge">Pharmacy Desk</span>
+    </div>
+
+    <div class="nav-actions">
+      <button class="nav-link-btn" onclick="openInventoryDrawer()">
+        <span>📦</span> Medicine Stock
+      </button>
+      <button type="button" class="btn-add-medicine" onclick="openAddMedicineModal()">
+        <span>＋</span> Add Medicine
+      </button>
+      <button class="nav-link-btn" onclick="logout()" style="color:var(--rose);">
+        <span>⏻</span> Logout
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN BODY -->
+  <main class="container">
+
+    <!-- KPI STATS -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon">⏳</div>
+        <div class="kpi-label">Pending Dispense Orders</div>
+        <div class="kpi-value" id="kpiPending" style="color:var(--amber);">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">✅</div>
+        <div class="kpi-label">Dispensed Prescriptions</div>
+        <div class="kpi-value" id="kpiDispensed" style="color:var(--emerald);">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">⚠️</div>
+        <div class="kpi-label">Low Stock Alerts</div>
+        <div class="kpi-value" id="kpiLowStock" style="color:var(--rose);">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">📋</div>
+        <div class="kpi-label">Total Pharmacy Orders</div>
+        <div class="kpi-value" id="kpiTotal">0</div>
+      </div>
+    </section>
+
+    <!-- CONTROLS & FILTERS -->
+    <section class="controls-bar">
+      <div class="filter-pills">
+        <button class="filter-pill active" onclick="setFilter('Pending', this)">⏳ Pending Orders (<span id="pillPendingCount">0</span>)</button>
+        <button class="filter-pill" onclick="setFilter('Dispensed', this)">✅ Dispensed</button>
+        <button class="filter-pill" onclick="setFilter('All', this)">All Prescriptions</button>
+      </div>
+
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="Search patient, doctor, Rx ID..." oninput="onSearchChange()">
+      </div>
+    </section>
+
+    <!-- QUEUE STREAM -->
+    <section class="queue-grid" id="queueList">
+      <div style="text-align:center; padding:48px 20px; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); border-radius:14px;">
+        <h3>Loading pharmacy queue…</h3>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- INVENTORY DRAWER -->
+  <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeInventoryDrawer()"></div>
+  <aside class="drawer" id="inventoryDrawer">
+    <div class="drawer-header">
+      <div style="font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px;">
+        <span>📦</span> Medicine Stock Inventory
+      </div>
+      <button style="background:none; border:none; color:var(--text-dim); font-size:20px; cursor:pointer;" onclick="closeInventoryDrawer()">✕</button>
+    </div>
+    <div class="drawer-body">
+      <input type="text" id="invSearchInput" placeholder="Filter medicines..." class="form-control" style="width:100%; padding:10px 14px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:#fff; margin-bottom:16px;" oninput="onInvSearch()">
+      
+      <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border); text-align:left; color:var(--text-dim);">
+            <th style="padding:8px;">Medicine</th>
+            <th style="padding:8px;">Price</th>
+            <th style="padding:8px;">Stock</th>
+            <th style="padding:8px;">Status</th>
+          </tr>
+        </thead>
+        <tbody id="inventoryTbody">
+          <tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-dim);">Loading inventory…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </aside>
+
+  <!-- TOAST NOTIFICATION -->
+  <div class="toast" id="toastBox">
+    <span style="font-size:20px;">✅</span>
+    <div id="toastMessage">Action completed successfully</div>
+  </div>
+
+  <script>
+    let currentFilter = 'Pending';
+    let rawQueue = [];
+    let inventoryList = [];
+
+    const $ = id => document.getElementById(id);
+
+        function calculatePrescriptionQuantity(m) {
+      // 1. Parse dosage units per intake (e.g. "1 tablet" -> 1, "2 capsules" -> 2)
+      let dosageUnits = null;
+      if (m.dosage) {
+        const dMatch = String(m.dosage).match(/(\d+(?:\.\d+)?)/);
+        if (dMatch) {
+          const val = parseFloat(dMatch[1]);
+          if (!isNaN(val) && val >= 1) dosageUnits = Math.floor(val);
+        }
+      }
+
+      // 2. Parse daily frequency count
+      let dailyFreq = null;
+      const freqStr = String(m.frequency || '').trim().toLowerCase();
+      if (freqStr.includes('-')) {
+        const parts = freqStr.split('-').map(x => parseInt(x.trim(), 10)).filter(x => !isNaN(x));
+        if (parts.length > 0) dailyFreq = parts.reduce((a, b) => a + b, 0);
+      } else if (freqStr.includes('thrice') || freqStr.includes('3/day') || freqStr.includes('three') || freqStr.includes('tid') || freqStr.includes('1-1-1')) {
+        dailyFreq = 3;
+      } else if (freqStr.includes('twice') || freqStr.includes('2/day') || freqStr.includes('two') || freqStr.includes('bid') || freqStr.includes('1-0-1')) {
+        dailyFreq = 2;
+      } else if (freqStr.includes('four') || freqStr.includes('4/day') || freqStr.includes('qid')) {
+        dailyFreq = 4;
+      } else if (freqStr.includes('once') || freqStr.includes('1/day') || freqStr.includes('one') || freqStr.includes('od') || freqStr.includes('qd')) {
+        dailyFreq = 1;
+      } else if (freqStr.includes('as needed') || freqStr.includes('sos') || freqStr.includes('prn')) {
+        dailyFreq = 1;
+      } else if (freqStr) {
+        const mDigits = freqStr.match(/(\d+)/);
+        if (mDigits) dailyFreq = parseInt(mDigits[1], 10);
+      }
+
+      // 3. Parse duration in days
+      let days = null;
+      const durStr = String(m.duration || '').trim().toLowerCase();
+      if (durStr.includes('week')) {
+        const wMatch = durStr.match(/(\d+)/);
+        const w = wMatch ? parseInt(wMatch[1], 10) : 1;
+        days = Math.max(1, w * 7);
+      } else if (durStr.includes('month')) {
+        const mMatch = durStr.match(/(\d+)/);
+        const mon = mMatch ? parseInt(mMatch[1], 10) : 1;
+        days = Math.max(1, mon * 30);
+      } else if (durStr) {
+        const dMatch = durStr.match(/(\d+)/);
+        if (dMatch) days = Math.max(1, parseInt(dMatch[1], 10));
+      }
+
+      // Fallback safely to standard qty (e.g. 10) if dosage or duration is missing
+      if (dosageUnits === null || days === null) {
+        return 10;
+      }
+
+      const freqCount = dailyFreq !== null ? dailyFreq : 2;
+      const computedQty = Math.max(1, dosageUnits * freqCount * days);
+
+      // Prevent any invalid/hardcoded test numbers (like 999999 or >= 500 or <= 0)
+      const rawQty = Number(m.quantity);
+      if (!isNaN(rawQty) && (rawQty === 999999 || rawQty >= 500 || rawQty <= 0)) {
+        return computedQty;
+      }
+
+      return computedQty;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+
+    // ─────────────────────────────────────────────
+    // CarePlus Modal & Toast Notification System
+    // ─────────────────────────────────────────────
+    let _careplusConfirmResolver = null;
+
+    function showCarePlusConfirm({
+      title = "Confirm Action",
+      message = "Are you sure you want to proceed?",
+      subtext = "",
+      icon = "🔔",
+      confirmText = "Confirm",
+      cancelText = "Cancel",
+      type = "primary"
+    } = {}) {
+      return new Promise((resolve) => {
+        _careplusConfirmResolver = resolve;
+
+        const modal = document.getElementById("careplusConfirmModalBackdrop");
+        const iconEl = document.getElementById("careplusModalIcon");
+        const titleEl = document.getElementById("careplusModalTitle");
+        const descEl = document.getElementById("careplusModalDesc");
+        const subtextEl = document.getElementById("careplusModalSubtext");
+        const confirmBtn = document.getElementById("careplusModalConfirmBtn");
+        const cancelBtn = document.getElementById("careplusModalCancelBtn");
+
+        if (iconEl) {
+          iconEl.textContent = icon;
+          iconEl.className = "careplus-modal-header-icon " + (type === 'danger' ? 'danger' : (type === 'success' ? 'success' : ''));
+        }
+        if (titleEl) titleEl.textContent = title;
+        if (descEl) descEl.innerHTML = message;
+        if (subtextEl) {
+          subtextEl.textContent = subtext;
+          subtextEl.style.display = subtext ? "block" : "none";
+        }
+        if (confirmBtn) {
+          confirmBtn.textContent = confirmText;
+          confirmBtn.className = "careplus-btn-confirm " + (type === 'danger' ? 'danger' : (type === 'success' ? 'success' : ''));
+        }
+        if (cancelBtn) {
+          cancelBtn.textContent = cancelText;
+          cancelBtn.style.display = cancelText ? "inline-block" : "none";
+        }
+
+        if (modal) modal.style.display = "flex";
+      });
+    }
+    window.showCarePlusConfirm = showCarePlusConfirm;
+
+    function resolveCareplusConfirm(val) {
+      const modal = document.getElementById("careplusConfirmModalBackdrop");
+      if (modal) modal.style.display = "none";
+      if (_careplusConfirmResolver) {
+        _careplusConfirmResolver(val);
+        _careplusConfirmResolver = null;
+      }
+    }
+    window.resolveCareplusConfirm = resolveCareplusConfirm;
+
+    function handleCareplusModalBackdrop(e) {
+      if (e.target && e.target.id === "careplusConfirmModalBackdrop") {
+        resolveCareplusConfirm(false);
+      }
+    }
+    window.handleCareplusModalBackdrop = handleCareplusModalBackdrop;
+
+    function showCarePlusToast(message, type = "success", title = "") {
+      let container = document.getElementById("careplusToastContainer");
+      if (!container) {
+        container = document.createElement("div");
+        container.id = "careplusToastContainer";
+        container.className = "careplus-toast-container";
+        document.body.appendChild(container);
+      }
+
+      const defaultTitles = {
+        success: "Success",
+        warning: "Attention",
+        error: "Alert",
+        info: "Notice"
+      };
+      const icons = {
+        success: "✓",
+        warning: "⚠️",
+        error: "✕",
+        info: "ℹ️"
+      };
+
+      const toastTitle = title || defaultTitles[type] || "Notification";
+      const icon = icons[type] || "🔔";
+
+      const t = document.createElement("div");
+      t.className = `careplus-toast ${type}`;
+      t.innerHTML = `
+        <div class="careplus-toast-icon">${icon}</div>
+        <div class="careplus-toast-body">
+          <div class="careplus-toast-title">${escapeHtml(toastTitle)}</div>
+          <div class="careplus-toast-msg">${message}</div>
+        </div>
+      `;
+      container.appendChild(t);
+
+      setTimeout(() => {
+        t.style.opacity = "0";
+        t.style.transform = "translateX(30px) scale(0.95)";
+        setTimeout(() => t.remove(), 300);
+      }, 3000);
+    }
+    window.showCarePlusToast = showCarePlusToast;
+
+    // Override window.alert to completely prevent default browser alert dialogs
+    window.alert = function(msg) {
+      showCarePlusToast(typeof msg === "object" ? JSON.stringify(msg) : String(msg), "warning", "Notice");
+    };
+
+    function showToast(msg, duration = 4000) {
+      const t = $('toastBox');
+      $('toastMessage').innerHTML = msg;
+      t.style.display = 'flex';
+      setTimeout(() => { t.style.display = 'none'; }, duration);
+    }
+
+    async function loadQueue() {
+      try {
+        const res = await fetch(`/api/method/hospital_management.api.get_pharmacy_queue?status=${encodeURIComponent(currentFilter)}`);
+        const data = await res.json();
+        if (data.message && data.message.status === 'success') {
+          rawQueue = data.message.queue || [];
+          const s = data.message.summary || {};
+          $('kpiPending').textContent = s.pending || 0;
+          $('pillPendingCount').textContent = s.pending || 0;
+          $('kpiDispensed').textContent = s.dispensed || 0;
+          $('kpiLowStock').textContent = s.low_stock_count || 0;
+          $('kpiTotal').textContent = s.total || 0;
+          renderQueue(rawQueue);
+        }
+      } catch (err) {
+        console.error(err);
+        $('queueList').innerHTML = `<div style="text-align:center; padding:40px; color:var(--rose);">Failed to load pharmacy queue.</div>`;
+      }
+    }
+
+    function renderQueue(list) {
+      const container = $('queueList');
+      if (!list || list.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:60px 20px; background:var(--surface); border:1px solid var(--border); border-radius:14px; color:var(--text-dim);">
+            <div style="font-size:36px; margin-bottom:12px;">🎉</div>
+            <h3 style="color:#fff; margin-bottom:6px;">No ${currentFilter === 'Pending' ? 'Pending' : ''} Prescriptions in Queue</h3>
+            <p style="font-size:13px;">All prescriptions are processed or no orders match your search criteria.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = list.map(rx => {
+        const isPending = rx.dispense_status === 'Pending';
+        const dateStr = rx.prescription_date ? new Date(rx.prescription_date).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}) : '—';
+        const initials = (rx.patient_name || rx.patient || 'P').split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('').toUpperCase();
+
+        const rxItems = rx.items || [];
+        const hasItems = rxItems.length > 0;
+        let cardComputedCost = 0;
+        let allItemsInStock = hasItems;
+
+        let medRows = '';
+        if (!hasItems) {
+          medRows = `
+            <tr>
+              <td colspan="8" style="text-align:center; padding:18px 12px; color:#f87171; background:rgba(239, 68, 68, 0.05); font-weight:600; font-size:13px; border-radius:6px;">
+                ⚠️ No medicines listed in this prescription.
+              </td>
+            </tr>
+          `;
+        } else {
+          medRows = rxItems.map((m, idx) => {
+            // Strictly calculate total quantity: Dosage per intake * daily frequency count * duration (days)
+            // Fallback safely to standard qty (e.g. 10) instead of overflow numbers
+            // Prevent any invalid/hardcoded test numbers (like 999999) from showing on the UI
+            const qty = calculatePrescriptionQuantity(m);
+
+            // Get unit rate
+            let unitPrice = 0;
+            if (m.unit_price != null && Number(m.unit_price) > 0) {
+              unitPrice = Number(m.unit_price);
+            } else if (m.total_price && m.quantity && Number(m.quantity) > 0 && Number(m.quantity) < 500) {
+              unitPrice = Number(m.total_price) / Number(m.quantity);
+            } else if (m.price != null && Number(m.price) > 0) {
+              unitPrice = Number(m.price);
+            }
+
+            // Recalculate Subtotal as Qty * Rate (e.g. 10 * 2.50 = 25.00)
+            const lineTotal = Number((qty * unitPrice).toFixed(2));
+            cardComputedCost += lineTotal;
+
+            const availStock = Number(m.available_stock || 0);
+            const hasStock = availStock >= qty;
+            if (!hasStock) allItemsInStock = false;
+
+            let stockClass = hasStock ? 'stock-in' : (availStock > 0 ? 'stock-low' : 'stock-out');
+            let stockText = hasStock ? 'In Stock' : (availStock > 0 ? 'Low Stock' : 'Out of Stock');
+
+            return `
+              <tr>
+                <td style="font-weight:700; width:40px; text-align:center;">${idx + 1}</td>
+                <td>
+                  <div style="font-weight:600; color:#fff;">${escapeHtml(m.medicine_name)}</div>
+                  <div style="font-size:11.5px; color:var(--text-dim);">${escapeHtml(m.instructions || 'After meals')}</div>
+                </td>
+                <td><span style="font-size:11px; padding:2px 8px; border-radius:4px; background:var(--surface2); color:var(--primary);">${escapeHtml(m.dosage || '1 tablet')}</span></td>
+                <td>${escapeHtml(m.frequency || '1-0-1')}</td>
+                <td>${escapeHtml(m.duration || '5 days')}</td>
+                <td style="font-weight:700; color:var(--primary);">${qty}</td>
+                <td>
+                  <span class="stock-badge ${stockClass}">
+                    ${stockClass === 'stock-in' ? '🟢' : (stockClass === 'stock-low' ? '🟡' : '🔴')}
+                    ${stockText} (${availStock} avail)
+                  </span>
+                </td>
+                <td style="text-align:right; font-weight:600;">₹${lineTotal.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        let actionArea = '';
+        if (isPending) {
+          if (!hasItems) {
+            actionArea = `
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:12px; color:#f87171; font-weight:600; padding:6px 12px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); border-radius:6px;">
+                  ⚠️ No items to dispense
+                </span>
+                <button class="btn-dispense" disabled style="opacity:0.45; cursor:not-allowed;" title="Cannot dispense: No medicines listed in this prescription">
+                  ⚡ Dispense & Generate Bill
+                </button>
+              </div>
+            `;
+          } else {
+            const canDispense = rx.all_items_in_stock && allItemsInStock;
+            actionArea = `
+              <button class="btn-dispense" id="btn-dispense-${escapeHtml(rx.name)}" ${canDispense ? '' : 'disabled title="Cannot dispense: One or more medicines are out of stock"'} onclick="dispensePrescription('${escapeHtml(rx.name)}')">
+                ⚡ Dispense & Generate Bill
+              </button>
+            `;
+          }
+        } else {
+          actionArea = `
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="badge-status badge-dispensed">✅ Dispensed</span>
+              <a href="/prescription_slip?name=${encodeURIComponent(rx.name)}" target="_blank" class="btn-action-sm">🖨️ Rx Slip</a>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="rx-card" id="rx-card-${escapeHtml(rx.name)}">
+            <div class="rx-card-header">
+              <div class="rx-patient-info">
+                <div class="patient-avatar">${initials}</div>
+                <div>
+                  <div class="patient-meta-name">${escapeHtml(rx.patient_name)}</div>
+                  <div class="patient-meta-details">
+                    <span>ID: ${escapeHtml(rx.patient)}</span>
+                    ${rx.patient_phone ? `<span>📞 ${escapeHtml(rx.patient_phone)}</span>` : ''}
+                    <span>📅 ${dateStr}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rx-badge-group">
+                <span class="rx-number-tag">📋 ${escapeHtml(rx.name)}</span>
+                <span class="badge-status ${isPending ? 'badge-pending' : 'badge-dispensed'}" id="status-badge-${escapeHtml(rx.name)}">
+                  ${isPending ? '⏳ Pending Dispense' : '✅ Dispensed'}
+                </span>
+              </div>
+            </div>
+
+            <!-- MEDICINE ITEMS CHECKLIST -->
+            <table class="meds-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Medicine</th>
+                  <th>Dosage</th>
+                  <th>Frequency</th>
+                  <th>Duration</th>
+                  <th>Qty Needed</th>
+                  <th>Stock Availability</th>
+                  <th style="text-align:right;">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${medRows}
+              </tbody>
+            </table>
+
+            <div class="rx-card-footer">
+              <div>
+                <div class="rx-totals">
+                  <span style="font-size:13px; color:var(--text-dim);">Estimated Pharmacy Cost:</span>
+                  <span class="rx-total-val">₹${(cardComputedCost > 0 ? cardComputedCost : Number(rx.total_cost || 0)).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                </div>
+                <div class="rx-doctor-note">
+                  Prescribed by <strong>${escapeHtml(rx.doctor_name || rx.doctor)}</strong> ${rx.department ? `(${escapeHtml(rx.department)})` : ''}
+                  ${rx.diagnosis_notes ? ` • Note: "${escapeHtml(rx.diagnosis_notes)}"` : ''}
+                </div>
+              </div>
+
+              <div>
+                ${actionArea}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setFilter(filterType, btn) {
+      currentFilter = filterType;
+      document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      loadQueue();
+    }
+
+    function onSearchChange() {
+      const q = $('searchInput').value.trim().toLowerCase();
+      if (!q) {
+        renderQueue(rawQueue);
+        return;
+      }
+      const filtered = rawQueue.filter(rx => 
+        (rx.name && rx.name.toLowerCase().includes(q)) ||
+        (rx.patient && rx.patient.toLowerCase().includes(q)) ||
+        (rx.patient_name && rx.patient_name.toLowerCase().includes(q)) ||
+        (rx.doctor && rx.doctor.toLowerCase().includes(q)) ||
+        (rx.doctor_name && rx.doctor_name.toLowerCase().includes(q)) ||
+        (rx.items && rx.items.some(i => i.medicine_name && i.medicine_name.toLowerCase().includes(q)))
+      );
+      renderQueue(filtered);
+    }
+
+    async function dispensePrescription(rxId) {
+      // Validate items exist in frontend before requesting dispense
+      const targetRx = (rawQueue || []).find(r => r.name === rxId);
+      if (targetRx && (!targetRx.items || targetRx.items.length === 0)) {
+        showCarePlusToast("Cannot dispense: No medicines listed in this prescription.", "error", "Validation Error");
+        return;
+      }
+
+      const confirmed = await showCarePlusConfirm({
+        title: "Confirm Medication Dispense",
+        message: `Dispense prescription <strong>${escapeHtml(rxId)}</strong>?`,
+        subtext: "Medication stock will be automatically deducted from inventory and an official pharmacy bill will be created.",
+        icon: "💊",
+        confirmText: "Dispense & Bill",
+        cancelText: "Cancel",
+        type: "success"
+      });
+      if (!confirmed) return;
+
+      const btn = document.getElementById(`btn-dispense-${rxId}`);
+      if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.innerHTML = '⏳ Dispensing...';
+      }
+
+      try {
+        const csrfToken = window.csrf_token || (typeof frappe !== 'undefined' && frappe.csrf_token) || '';
+        const res = await fetch('/api/method/hospital_management.api.dispense_prescription_and_bill', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Frappe-CSRF-Token': csrfToken
+          },
+          body: JSON.stringify({ prescription_id: rxId, payment_method: 'Cash' })
+        });
+
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (e) {
+          data = {};
+        }
+
+        const isSuccess = res.ok && data && data.message && data.message.status === 'success';
+
+        if (isSuccess) {
+          // Immediately update card status to Dispensed in DOM
+          const badge = document.getElementById(`status-badge-${rxId}`);
+          if (badge) {
+            badge.className = 'badge-status badge-dispensed';
+            badge.innerHTML = '✅ Dispensed';
+          }
+          if (btn && btn.parentElement) {
+            btn.parentElement.innerHTML = `
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="badge-status badge-dispensed">✅ Dispensed</span>
+                <a href="/prescription_slip?name=${encodeURIComponent(rxId)}" target="_blank" class="btn-action-sm">🖨️ Rx Slip</a>
+              </div>
+            `;
+          }
+          if (targetRx) {
+            targetRx.dispense_status = 'Dispensed';
+          }
+
+          // Show green success notification: "Prescription dispensed and bill generated successfully!"
+          showCarePlusToast("Prescription dispensed and bill generated successfully!", "success", "Prescription Dispensed");
+
+          // Refresh counts and queue
+          await loadQueue();
+        } else {
+          // Restore button state on error
+          if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.innerHTML = '⚡ Dispense & Generate Bill';
+          }
+
+          // Robust extraction of exact error message
+          let errMsg = '';
+          if (data && data.message) {
+            if (typeof data.message === 'string') {
+              errMsg = data.message;
+            } else if (data.message.message) {
+              errMsg = data.message.message;
+            }
+          }
+          if (!errMsg && data && data._server_messages) {
+            try {
+              const parsed = JSON.parse(data._server_messages);
+              errMsg = parsed.map(m => {
+                try {
+                  const inner = JSON.parse(m);
+                  return inner.message ? inner.message.replace(/<[^>]*>?/gm, '') : m;
+                } catch(e) {
+                  return m;
+                }
+              }).join('; ');
+            } catch (e) {}
+          }
+          if (!errMsg && data && data.exception) {
+            errMsg = data.exception.split(':').slice(1).join(':').trim() || data.exception;
+          }
+          if (!errMsg) {
+            errMsg = `Dispense failed (Status ${res.status}): Please check medicines and stock availability.`;
+          }
+
+          // Display exact error message inside modern alert card instead of "Unknown error"
+          showCarePlusToast(errMsg, 'error', 'Dispense Failed');
+        }
+      } catch (err) {
+        console.error(err);
+        if (btn) {
+          btn.disabled = false;
+          btn.style.opacity = '1';
+          btn.innerHTML = '⚡ Dispense & Generate Bill';
+        }
+        showCarePlusToast('Error connecting to pharmacy server: ' + (err.message || 'Network error'), 'error', 'Network Error');
+      }
+    }
+
+    // INVENTORY DRAWER
+    async function openInventoryDrawer() {
+      $('drawerBackdrop').classList.add('active');
+      $('inventoryDrawer').classList.add('active');
+      try {
+        const res = await fetch('/api/method/hospital_management.api.get_medicines_stock_list');
+        const data = await res.json();
+        inventoryList = data.message || [];
+        renderInventory(inventoryList);
+      } catch (err) {
+        console.error(err);
+        $('inventoryTbody').innerHTML = `<tr><td colspan="4" style="color:var(--rose); padding:20px;">Failed to load stock.</td></tr>`;
+      }
+    }
+
+    function closeInventoryDrawer() {
+      $('drawerBackdrop').classList.remove('active');
+      $('inventoryDrawer').classList.remove('active');
+    }
+
+    function renderInventory(list) {
+      if (!list || list.length === 0) {
+        $('inventoryTbody').innerHTML = `<tr><td colspan="4" style="color:var(--text-dim); text-align:center; padding:20px;">No medicines found.</td></tr>`;
+        return;
+      }
+
+      $('inventoryTbody').innerHTML = list.map(m => {
+        const qty = Number(m.quantity || 0);
+        let statusTag = '<span style="color:var(--emerald); font-weight:700;">In Stock</span>';
+        if (qty <= 0) statusTag = '<span style="color:var(--rose); font-weight:700;">Out of Stock</span>';
+        else if (qty <= 20) statusTag = '<span style="color:var(--amber); font-weight:700;">Low Stock</span>';
+
+        return `
+          <tr style="border-bottom:1px solid var(--border-subtle);">
+            <td style="padding:10px 8px;">
+              <div style="font-weight:600; color:#fff;">${escapeHtml(m.medicine_name || m.name)}</div>
+              <div style="font-size:11px; color:var(--text-dim);">${escapeHtml(m.name)} ${m.batch_number ? `• Batch: ${escapeHtml(m.batch_number)}` : ''}</div>
+            </td>
+            <td style="padding:10px 8px;">₹${Number(m.price || 0).toFixed(2)}</td>
+            <td style="padding:10px 8px; font-weight:700;">${qty}</td>
+            <td style="padding:10px 8px;">${statusTag}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function onInvSearch() {
+      const q = $('invSearchInput').value.trim().toLowerCase();
+      const filtered = inventoryList.filter(m => 
+        (m.medicine_name && m.medicine_name.toLowerCase().includes(q)) ||
+        (m.name && m.name.toLowerCase().includes(q))
+      );
+      renderInventory(filtered);
+    }
+
+    async function logout() {
+      const confirmed = await showCarePlusConfirm({
+        title: "Confirm Sign Out",
+        message: "Are you sure you want to end your active pharmacy session?",
+        subtext: "Any unsaved medication updates will be closed and you will be returned to login.",
+        icon: "⏻",
+        confirmText: "Sign Out",
+        cancelText: "Cancel",
+        type: "danger"
+      });
+      if (!confirmed) return;
+
+      showCarePlusToast("Logged out successfully. Redirecting...", "success", "Signed Out");
+      try {
+        await fetch('/api/method/hospital_management.api.logout', { method: 'POST' });
+      } catch (err) {}
+      window.history.replaceState(null, document.title, '/frontend');
+      setTimeout(() => window.location.replace('/frontend'), 700);
+    }
+
+    // ADD MEDICINE MODAL FUNCTIONS
+    function openAddMedicineModal() {
+      const backdrop = document.getElementById('addMedicineModalBackdrop');
+      if (backdrop) {
+        document.getElementById('addMedicineForm').reset();
+        document.getElementById('medThresholdInput').value = '20';
+        const alertEl = document.getElementById('medModalAlert');
+        if (alertEl) alertEl.style.display = 'none';
+        backdrop.style.display = 'flex';
+        setTimeout(() => {
+          const input = document.getElementById('medNameInput');
+          if (input) input.focus();
+        }, 100);
+      }
+    }
+    window.openAddMedicineModal = openAddMedicineModal;
+
+    function closeAddMedicineModal() {
+      const backdrop = document.getElementById('addMedicineModalBackdrop');
+      if (backdrop) backdrop.style.display = 'none';
+    }
+    window.closeAddMedicineModal = closeAddMedicineModal;
+
+    function handleMedicineBackdropClick(e) {
+      if (e.target && e.target.id === 'addMedicineModalBackdrop') {
+        closeAddMedicineModal();
+      }
+    }
+    window.handleMedicineBackdropClick = handleMedicineBackdropClick;
+
+    // Handle Esc key to close modal
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeAddMedicineModal();
+      }
+    });
+
+    async function handleCreateMedicineSubmit(e) {
+      e.preventDefault();
+      const nameInput = document.getElementById('medNameInput');
+      const batchInput = document.getElementById('medBatchInput');
+      const priceInput = document.getElementById('medPriceInput');
+      const qtyInput = document.getElementById('medQtyInput');
+      const thresholdInput = document.getElementById('medThresholdInput');
+      const alertEl = document.getElementById('medModalAlert');
+      const submitBtn = document.getElementById('btnSubmitNewMedicine');
+
+      const name = (nameInput.value || '').trim();
+      const batch = (batchInput.value || '').trim();
+      const price = parseFloat(priceInput.value);
+      const qty = parseInt(qtyInput.value, 10);
+      const threshold = parseInt(thresholdInput.value || '20', 10);
+
+      if (!name) {
+        if (alertEl) {
+          alertEl.textContent = 'Please enter a valid Medicine Name.';
+          alertEl.style.display = 'block';
+        }
+        nameInput.focus();
+        return;
+      }
+
+      if (isNaN(price) || price < 0) {
+        if (alertEl) {
+          alertEl.textContent = 'Please enter a valid Selling Price.';
+          alertEl.style.display = 'block';
+        }
+        priceInput.focus();
+        return;
+      }
+
+      if (isNaN(qty) || qty <= 0) {
+        if (alertEl) {
+          alertEl.textContent = 'Initial Stock Quantity must be at least 1.';
+          alertEl.style.display = 'block';
+        }
+        qtyInput.focus();
+        return;
+      }
+
+      if (alertEl) alertEl.style.display = 'none';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.6';
+        submitBtn.innerHTML = '<span>⏳</span> Saving...';
+      }
+
+      try {
+        const csrfToken = window.csrf_token || (typeof frappe !== 'undefined' && frappe.csrf_token) || '';
+        const res = await fetch('/api/method/hospital_management.api.add_medicine', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Frappe-CSRF-Token': csrfToken
+          },
+          body: JSON.stringify({
+            medicine_name: name,
+            batch_number: batch || undefined,
+            price: price,
+            quantity: qty,
+            threshold: threshold
+          })
+        });
+
+        let data = {};
+        try {
+          data = await res.json();
+        } catch(err) {
+          data = {};
+        }
+
+        const isSuccess = res.ok && data && data.message && data.message.status === 'success';
+
+        if (isSuccess) {
+          closeAddMedicineModal();
+          showCarePlusToast(`Medicine "${escapeHtml(name)}" added to inventory successfully!`, 'success', 'Medicine Added');
+          // Refresh pharmacy queue & KPI stats
+          await loadQueue();
+          // If drawer is active, refresh stock
+          const drawer = document.getElementById('inventoryDrawer');
+          if (drawer && drawer.classList.contains('active')) {
+            openInventoryDrawer();
+          }
+        } else {
+          let errMsg = 'Failed to add medicine stock.';
+          if (data && data.message) {
+            if (typeof data.message === 'string') errMsg = data.message;
+            else if (data.message.message) errMsg = data.message.message;
+          } else if (data && data._server_messages) {
+            try {
+              const parsed = JSON.parse(data._server_messages);
+              errMsg = parsed.map(m => JSON.parse(m).message).join('; ');
+            } catch(e) {}
+          }
+          if (alertEl) {
+            alertEl.textContent = errMsg;
+            alertEl.style.display = 'block';
+          }
+          showCarePlusToast(errMsg, 'error', 'Error');
+        }
+      } catch (err) {
+        console.error(err);
+        const errMsg = 'Connection error while saving medicine stock.';
+        if (alertEl) {
+          alertEl.textContent = errMsg;
+          alertEl.style.display = 'block';
+        }
+        showCarePlusToast(errMsg, 'error', 'Network Error');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = '1';
+          submitBtn.innerHTML = '<span class="btn-icon">＋</span><span class="btn-label">Add Medicine Stock</span>';
+        }
+      }
+    }
+    window.handleCreateMedicineSubmit = handleCreateMedicineSubmit;
+
+    // Auto load on start
+    loadQueue();
+  </script>
+
+<!-- ADD MEDICINE MODAL (Dark Glassmorphic Popup) -->
+<div class="modal-backdrop" id="addMedicineModalBackdrop" onclick="handleMedicineBackdropClick(event)">
+  <div class="modal-card" id="addMedicineModal" role="dialog" aria-modal="true" aria-labelledby="medModalTitle">
+    <div class="modal-header">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="modal-icon" style="background:linear-gradient(135deg, rgba(56,189,248,0.2), rgba(99,102,241,0.25)); border:1px solid rgba(56,189,248,0.4); color:#38bdf8;">💊</div>
+        <div>
+          <h2 id="medModalTitle" class="modal-title">Add New Medicine</h2>
+          <p class="modal-desc">Register medication details and stock inventory for the pharmacy desk.</p>
+        </div>
+      </div>
+      <button type="button" class="modal-close-btn" onclick="closeAddMedicineModal()" title="Close (Esc)">✕</button>
+    </div>
+
+    <form id="addMedicineForm" onsubmit="handleCreateMedicineSubmit(event)">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group full-width">
+            <label for="medNameInput">Medicine Name <span class="req">*</span></label>
+            <input type="text" id="medNameInput" class="form-control" placeholder="e.g. Paracetamol 500mg, Amoxicillin 250mg" required autocomplete="off">
+          </div>
+        </div>
+
+        <div class="form-row two-col">
+          <div class="form-group">
+            <label for="medBatchInput">Batch Number <span class="opt">(optional)</span></label>
+            <input type="text" id="medBatchInput" class="form-control" placeholder="e.g. BAT-2026-01" autocomplete="off">
+            <small class="form-hint">Auto-generated if left blank</small>
+          </div>
+          <div class="form-group">
+            <label for="medPriceInput">Selling Price (₹) <span class="req">*</span></label>
+            <input type="number" id="medPriceInput" class="form-control" placeholder="e.g. 15.00" step="0.01" min="0" required>
+          </div>
+        </div>
+
+        <div class="form-row two-col">
+          <div class="form-group">
+            <label for="medQtyInput">Initial Stock Quantity <span class="req">*</span></label>
+            <input type="number" id="medQtyInput" class="form-control" placeholder="e.g. 100" min="1" required>
+          </div>
+          <div class="form-group">
+            <label for="medThresholdInput">Threshold <span class="opt">(Low Stock Alert)</span></label>
+            <input type="number" id="medThresholdInput" class="form-control" placeholder="e.g. 20" min="1" value="20">
+            <small class="form-hint">Triggers low stock badge</small>
+          </div>
+        </div>
+
+        <div id="medModalAlert" class="modal-alert error" style="display:none;"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-modal-cancel" onclick="closeAddMedicineModal()">Cancel</button>
+        <button type="submit" class="btn-modal-submit" id="btnSubmitNewMedicine">
+          <span class="btn-icon">＋</span>
+          <span class="btn-label">Add Medicine Stock</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- CAREPLUS REUSABLE NOTIFICATION / CONFIRMATION MODAL -->
+<div class="careplus-modal-backdrop" id="careplusConfirmModalBackdrop" style="display:none;" onclick="handleCareplusModalBackdrop(event)">
+  <div class="careplus-modal-card" id="careplusConfirmModalCard" role="dialog" aria-modal="true">
+    <div class="careplus-modal-glow"></div>
+    <div class="careplus-modal-header-icon" id="careplusModalIcon">🔔</div>
+    <h3 class="careplus-modal-title" id="careplusModalTitle">Confirmation</h3>
+    <p class="careplus-modal-desc" id="careplusModalDesc">Are you sure you want to proceed?</p>
+    <p class="careplus-modal-subtext" id="careplusModalSubtext"></p>
+    <div class="careplus-modal-actions">
+      <button type="button" class="careplus-btn-cancel" id="careplusModalCancelBtn" onclick="resolveCareplusConfirm(false)">Cancel</button>
+      <button type="button" class="careplus-btn-confirm" id="careplusModalConfirmBtn" onclick="resolveCareplusConfirm(true)">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- CAREPLUS TOP-RIGHT FLOATING TOAST CONTAINER -->
+<div id="careplusToastContainer" class="careplus-toast-container" role="status" aria-live="polite"></div>
+
+</body>
+</html>

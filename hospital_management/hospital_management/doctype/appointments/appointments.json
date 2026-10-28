@@ -54,7 +54,8 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Scheduled\nConfirmed\nCompleted\nCancelled"
+   "options": "Requested\nScheduled\nConfirmed\nChecked In\nIn Consultation\nCompleted\nCancelled\nNo Show",
+   "in_list_view": 1
   },
   {
    "fieldname": "consultation_fee",
@@ -82,43 +83,60 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-13 16:01:21.924694",
+ "modified": "2026-10-23 11:15:00.000000",
  "modified_by": "Administrator",
  "module": "Hospital Management",
  "name": "Appointments",
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
-   "email": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "report": 1
   },
   {
+   "role": "Hospital Administrator",
+   "read": 1,
+   "write": 1,
    "create": 1,
-   "email": 1,
+   "delete": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Receptionist",
-   "share": 1,
-   "write": 1
+   "report": 1
   },
   {
-   "email": 1,
-   "export": 1,
-   "print": 1,
+   "role": "Doctor",
    "read": 1,
-   "report": 1,
-   "role": "doctor",
-   "share": 1
+   "write": 1,
+   "create": 1,
+   "delete": 0,
+   "print": 1
+  },
+  {
+   "role": "Nurse",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0
+  },
+  {
+   "role": "Patient",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 0
+  },
+  {
+   "role": "Pharmacy Staff",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0
   }
  ],
  "row_format": "Dynamic",

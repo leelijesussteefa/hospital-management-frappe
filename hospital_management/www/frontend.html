@@ -1,290 +1,1285 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CarePlus | Hospital Management</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>CarePlus | Unified Healthcare Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', Arial, sans-serif; }
+    :root {
+      --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --bg-page: radial-gradient(120% 85% at 50% 10%, #e0f2fe 0%, #edf7ff 35%, #f8fafc 85%, #f1f5f9 100%);
+      --text-dark: #0f172a;
+      --text-muted: #475569;
+      --text-light: #64748b;
+      --text-dim: #94a3b8;
+      --primary-blue: #0284c7;
+      --primary-hover: #0369a1;
+      --primary-gradient: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      --card-bg: #ffffff;
+      --border-color: #e2e8f0;
+      --border-focus: #0284c7;
+      --shadow-card: 0 20px 60px -15px rgba(2, 132, 199, 0.1), 0 10px 30px -10px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(255, 255, 255, 0.9);
+      --shadow-btn: 0 4px 16px rgba(2, 132, 199, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
+      font-family: var(--font-main);
+      background: var(--bg-page);
+      color: var(--text-dark);
       min-height: 100vh;
-      background: linear-gradient(135deg, #0d1b2a 0%, #1a1f3a 50%, #0d2137 100%);
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow-x: hidden;
+      position: relative;
     }
 
-    .container {
-      width: 100%;
-      max-width: 980px;
-      min-height: 580px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      background: rgba(22, 27, 34, 0.95);
-      border-radius: 24px;
+    /* BACKGROUND CLINICAL GRAPHICS */
+    .bg-graphics {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
       overflow: hidden;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
-      backdrop-filter: blur(20px);
     }
 
-    .welcome {
-      background: linear-gradient(145deg, #087f8c 0%, #174ea6 60%, #1a1f5e 100%);
-      color: white;
-      padding: 55px 44px;
+    /* Ambient Subtle Grid */
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 1px 1px, rgba(2, 132, 199, 0.08) 1px, transparent 0);
+      background-size: 32px 32px;
+      opacity: 0.7;
+    }
+
+    /* Doctor Silhouette Watermark on the Left */
+    .doctor-watermark {
+      position: absolute;
+      left: 3%;
+      top: 15%;
+      bottom: 5%;
+      width: 420px;
+      opacity: 0.12;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 700' fill='%230284c7'%3E%3Cpath d='M250 80c44 0 80 36 80 80s-36 80-80 80-80-36-80-80 36-80 80-80zm0 190c66 0 160 38 160 110v220H90V380c0-72 94-110 160-110zm-35 85l35 60 35-60h45l-55 90v120h-50V445l-55-90h45z'/%3E%3C/svg%3E") no-repeat center bottom;
+      background-size: contain;
+      filter: blur(1px);
+    }
+
+    /* Right Side Vertical Connected Hexagons */
+    .hex-network {
+      position: absolute;
+      right: 4%;
+      top: 50%;
+      transform: translateY(-50%);
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      gap: 18px;
+      opacity: 0.28;
     }
 
-    .logo {
-      font-size: 24px;
-      font-weight: 800;
-      margin-bottom: 48px;
-    }
-    .logo span { color: #8ff3e7; }
-    .medical-icon { font-size: 64px; margin-bottom: 24px; }
-    .welcome h1 { font-size: 36px; line-height: 1.25; margin-bottom: 18px; font-weight: 800; }
-    .welcome p { color: rgba(255,255,255,0.7); line-height: 1.8; font-size: 14px; }
-
-    .features {
-      margin-top: 28px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .feature-item {
+    .hex-item {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 14px;
+      color: #0284c7;
       font-size: 13px;
-      color: rgba(255,255,255,0.75);
+      font-weight: 700;
+      letter-spacing: -0.2px;
     }
 
-    .login-section {
-      padding: 50px 44px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      background: #0d1117;
-    }
-
-    .login-section h2 {
-      color: #f1f5f9;
-      font-size: 26px;
-      font-weight: 800;
-      margin-bottom: 6px;
-    }
-    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 28px; }
-
-    .tabs {
-      display: flex;
-      background: #1c2330;
-      padding: 4px;
-      border-radius: 12px;
-      margin-bottom: 28px;
-      border: 1px solid #30363d;
-    }
-    .tab {
-      flex: 1;
-      border: none;
-      padding: 12px 8px;
-      cursor: pointer;
-      border-radius: 9px;
-      font-size: 13px;
-      font-weight: 600;
-      color: #64748b;
-      background: transparent;
-      transition: all 0.25s;
+    .hex-shape {
+      width: 48px;
+      height: 48px;
+      border: 1.5px solid #0284c7;
+      border-radius: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-    }
-    .tab.active {
-      background: linear-gradient(135deg, #087f8c, #174ea6);
-      color: white;
+      background: rgba(255, 255, 255, 0.7);
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.08);
+      font-size: 20px;
     }
 
-    .form-group { margin-bottom: 18px; }
-    label {
-      display: block;
-      color: #94a3b8;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 8px;
+    /* TOP HEADER BAR */
+    .top-navbar {
+      position: relative;
+      z-index: 10;
+      padding: 16px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .brand-icon-box {
+      width: 38px;
+      height: 38px;
+      border: 2px solid var(--primary-blue);
+      border-radius: 11px;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary-blue);
+      font-size: 22px;
+      font-weight: 800;
+      box-shadow: 0 2px 10px rgba(2, 132, 199, 0.15);
+      line-height: 1;
+    }
+
+    .brand-name {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-dark);
+      letter-spacing: -0.4px;
+    }
+
+    .badge-healthos {
+      background: #e0f2fe;
+      color: var(--primary-blue);
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 9999px;
+      letter-spacing: 0.6px;
       text-transform: uppercase;
     }
-    input {
-      width: 100%;
-      padding: 13px 16px;
-      border: 1px solid #30363d;
-      border-radius: 10px;
-      outline: none;
-      font-size: 14px;
-      background: #161b22;
-      color: #e6edf3;
-    }
-    input:focus { border-color: #087f8c; }
 
-    .login-btn {
-      width: 100%;
-      padding: 14px;
-      border: none;
+    .status-pills {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-pill {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 9999px;
+      padding: 7px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+      white-space: nowrap;
+    }
+
+    .status-dot-green {
+      width: 7px;
+      height: 7px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+    }
+
+    .val-green {
+      color: #16a34a;
+      font-weight: 700;
+      font-family: monospace;
+    }
+
+    .val-blue {
+      color: var(--primary-blue);
+      font-weight: 700;
+    }
+
+    .val-fips {
+      color: var(--text-dark);
+      font-weight: 700;
+    }
+
+    /* MAIN CONTAINER */
+    .main-wrap {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px;
+      flex: 1;
+    }
+
+    /* LOGIN CARD */
+    .login-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: 28px;
+      box-shadow: var(--shadow-card);
+      width: min(520px, 94vw);
+      padding: 40px 42px;
+      position: relative;
+      text-align: center;
+      animation: cardEntrance 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes cardEntrance {
+      from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.98);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Card Logo Badge */
+    .card-logo-badge {
+      width: 60px;
+      height: 60px;
+      border: 2.5px solid var(--primary-blue);
+      border-radius: 17px;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary-blue);
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 auto 16px auto;
+      box-shadow: 0 4px 16px rgba(2, 132, 199, 0.12);
+      line-height: 1;
+    }
+
+    .card-brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .card-brand-name {
+      font-size: 21px;
+      font-weight: 800;
+      color: var(--text-dark);
+      letter-spacing: -0.3px;
+    }
+
+    .badge-enterprise {
+      background: #e0f2fe;
+      color: var(--primary-blue);
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-enterprise::before {
+      content: "●";
+      font-size: 7px;
+    }
+
+    .card-title {
+      font-size: 23px;
+      font-weight: 800;
+      color: var(--text-dark);
+      letter-spacing: -0.4px;
+      margin-bottom: 8px;
+    }
+
+    .card-subtitle {
+      font-size: 13.5px;
+      color: var(--text-light);
+      line-height: 1.45;
+      margin-bottom: 24px;
+      font-weight: 500;
+    }
+
+    /* ALERTS (Error / Success) */
+    .alert-banner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
       border-radius: 10px;
-      background: linear-gradient(135deg, #087f8c, #174ea6);
-      color: white;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-align: left;
+      margin-bottom: 18px;
+      animation: alertIn 0.2s ease;
+    }
+
+    @keyframes alertIn {
+      from {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .alert-banner.active {
+      display: flex;
+    }
+
+    .alert-error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+    }
+
+    .alert-success {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #15803d;
+    }
+
+    /* FORM ELEMENTS */
+    .login-form {
+      text-align: left;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 7px;
+    }
+
+    .form-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .forgot-link {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--primary-blue);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .forgot-link:hover {
+      color: var(--primary-hover);
+      text-decoration: underline;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon-prefix {
+      position: absolute;
+      left: 14px;
+      color: var(--text-dim);
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .input-control {
+      width: 100%;
+      height: 48px;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 0 42px 0 42px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text-dark);
+      font-weight: 500;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .input-control:focus {
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 3.5px rgba(2, 132, 199, 0.14);
+    }
+
+    .btn-toggle-eye {
+      position: absolute;
+      right: 12px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-dim);
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      transition: color 0.15s;
+    }
+
+    .btn-toggle-eye:hover {
+      color: var(--text-dark);
+    }
+
+    /* REMEMBER WORKSTATION & 2FA */
+    .options-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 16px 0 22px 0;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 13px;
+      color: #334155;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .custom-checkbox {
+      width: 17px;
+      height: 17px;
+      border-radius: 5px;
+      border: 1.5px solid #cbd5e1;
+      background: #ffffff;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+      display: grid;
+      place-content: center;
+      transition: all 0.15s;
+    }
+
+    .custom-checkbox:checked {
+      background: var(--primary-blue);
+      border-color: var(--primary-blue);
+    }
+
+    .custom-checkbox:checked::before {
+      content: "";
+      width: 8px;
+      height: 4.5px;
+      border-left: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      transform: rotate(-45deg) translate(1px, -1px);
+    }
+
+    .badge-2fa {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid rgba(22, 163, 74, 0.2);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .badge-2fa::before {
+      content: "●";
+      font-size: 7px;
+      color: #16a34a;
+    }
+
+    /* SUBMIT BUTTON */
+    .btn-submit {
+      width: 100%;
+      height: 48px;
+      background: var(--primary-gradient);
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
       font-size: 15px;
       font-weight: 700;
+      font-family: inherit;
       cursor: pointer;
-      margin-top: 6px;
-    }
-    .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-    .message {
-      margin-top: 16px;
-      font-size: 13px;
-      text-align: center;
-      min-height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: var(--shadow-btn);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    .footer {
-      margin-top: 28px;
+    .btn-submit:hover {
+      box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* CONSOLE LINK */
+    .console-link-wrap {
       text-align: center;
+      margin: 16px 0 20px 0;
+    }
+
+    .console-link {
+      color: var(--text-light);
+      font-size: 12.5px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.15s;
+    }
+
+    .console-link:hover {
+      color: var(--primary-blue);
+    }
+
+    /* QUICK DEMO LOGINS SECTION */
+    .demo-section {
+      border-top: 1px solid #f1f5f9;
+      padding-top: 18px;
+      margin-top: 4px;
+    }
+
+    .demo-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .demo-title-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       font-size: 11px;
-      color: #484f58;
+      font-weight: 800;
+      color: #334155;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
     }
 
-    @media (max-width: 700px) {
-      .container { grid-template-columns: 1fr; }
-      .welcome { padding: 32px 24px; }
-      .login-section { padding: 32px 24px; }
+    .demo-dot-green {
+      width: 7px;
+      height: 7px;
+      background: #10b981;
+      border-radius: 50%;
+    }
+
+    .demo-hint {
+      font-size: 11.5px;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .demo-card {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 10px 12px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .demo-card:hover {
+      border-color: var(--primary-blue);
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.12);
+      transform: translateY(-1.5px);
+    }
+
+    .demo-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .demo-role-badge {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-role-admin {
+      background: #fee2e2;
+      color: #e11d48;
+    }
+
+    .badge-role-clinical {
+      background: #e0f2fe;
+      color: #0284c7;
+    }
+
+    .badge-role-patient {
+      background: #fef3c7;
+      color: #d97706;
+    }
+
+    .badge-role-pharmacy {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .badge-role-billing {
+      background: #f3e8ff;
+      color: #7e22ce;
+    }
+
+    .demo-icon-sm {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    .demo-persona-name {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+
+    .demo-persona-email {
+      font-size: 10px;
+      color: var(--text-light);
+      font-family: monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* MORE ROLES EXPANDER */
+    .more-roles-toggle {
+      margin-top: 10px;
+      text-align: center;
+    }
+
+    .btn-more-roles {
+      background: none;
+      border: none;
+      color: var(--primary-blue);
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
+    .extra-roles-grid {
+      display: none;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .extra-roles-grid.open {
+      display: grid;
+    }
+
+    /* BOTTOM FOOTER BAR */
+    .bottom-footer {
+      position: relative;
+      z-index: 10;
+      border-top: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 14px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-light);
+      width: 100%;
+    }
+
+    .cert-items {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .cert-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .cert-divider {
+      color: var(--text-dim);
+    }
+
+    .copyright-text {
+      font-weight: 500;
+      color: var(--text-light);
+    }
+
+    /* RESPONSIVE BREAKPOINTS */
+    @media (max-width: 900px) {
+
+      .doctor-watermark,
+      .hex-network {
+        display: none;
+      }
+
+      .status-pills {
+        display: none;
+      }
+
+      .top-navbar {
+        padding: 14px 20px;
+      }
+
+      .bottom-footer {
+        padding: 14px 20px;
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+      }
+    }
+
+    @media (max-width: 540px) {
+      .login-card {
+        padding: 30px 22px;
+        border-radius: 22px;
+      }
+
+      .demo-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .extra-roles-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 
 <body>
-  <div class="container">
-    <div class="welcome">
-      <div class="logo">✚ Care<span>Plus</span></div>
-      <div class="medical-icon">🏥</div>
-      <h1>Your Health,<br>Our Priority.</h1>
-      <p>Welcome to CarePlus Hospital Management System. Access your healthcare portal securely.</p>
-      <div class="features">
-        <div class="feature-item">📅 View & track appointments</div>
-        <div class="feature-item">💊 Access your prescriptions</div>
-        <div class="feature-item">📋 Review medical records</div>
-        <div class="feature-item">🩺 Doctor clinical dashboard</div>
+
+  <!-- BACKGROUND DECORATIONS -->
+  <div class="bg-graphics">
+    <div class="bg-grid"></div>
+    <div class="doctor-watermark" aria-hidden="true"></div>
+    <div class="hex-network" aria-hidden="true">
+      <div class="hex-item">
+        <div class="hex-shape">🩺</div>
+        <span>Online Consultation</span>
       </div>
-    </div>
-
-    <div class="login-section">
-      <h2 id="loginTitle">Welcome Back!</h2>
-      <p class="subtitle" id="loginSubtitle">Sign in to your patient account</p>
-
-      <div class="tabs">
-        <button class="tab active" id="patientTab" type="button" onclick="switchRole('patient')">
-          🧑 Patient
-        </button>
-        <button class="tab" id="doctorTab" type="button" onclick="switchRole('doctor')">
-          🩺 Doctor
-        </button>
+      <div class="hex-item">
+        <div class="hex-shape">📅</div>
+        <span>Appointment Booking</span>
       </div>
-
-      <form id="loginForm">
-        <div class="form-group">
-          <label for="email">Email Address</label>
-          <input type="email" id="email" placeholder="Enter your email" required>
-        </div>
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input type="password" id="password" placeholder="Enter your password" required>
-        </div>
-        <button type="submit" class="login-btn" id="loginButton">
-          Sign In as Patient
-        </button>
-        <p class="message" id="message"></p>
-
-        <div style="margin-top:16px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;font-size:12px;color:#94a3b8;line-height:1.5;">
-          💡 <strong>Patient:</strong> <code>tharun@gmail.com</code> | <code>Patient@123</code><br>
-          💡 <strong>Doctor:</strong> <code>amali@gmail.com</code> | <code>Doctor@123</code>
-        </div>
-      </form>
-
-      <div class="footer">
-        © 2026 CarePlus Hospital Management System
+      <div class="hex-item">
+        <div class="hex-shape">💊</div>
+        <span>E-Prescription</span>
+      </div>
+      <div class="hex-item">
+        <div class="hex-shape">💓</div>
+        <span>Health Monitoring</span>
+      </div>
+      <div class="hex-item">
+        <div class="hex-shape">🛡️</div>
+        <span>Secure & Reliable</span>
       </div>
     </div>
   </div>
 
-  <script>
-    let currentRole = 'patient';
+  <!-- TOP NAVBAR -->
+  <header class="top-navbar">
+    <a href="/frontend" class="brand-group" title="CarePlus Health OS">
+      <div class="brand-icon-box">✚</div>
+      <span class="brand-name">CarePlus</span>
+      <span class="badge-healthos">HEALTH OS</span>
+    </a>
 
-    function switchRole(role) {
-      currentRole = role;
-      const isDoctor = role === 'doctor';
-      document.getElementById('patientTab').classList.toggle('active', !isDoctor);
-      document.getElementById('doctorTab').classList.toggle('active', isDoctor);
-      document.getElementById('loginTitle').textContent = isDoctor ? 'Doctor Login' : 'Welcome Back!';
-      document.getElementById('loginSubtitle').textContent = isDoctor
-        ? 'Sign in to your doctor account'
-        : 'Sign in to your patient account';
-      document.getElementById('loginButton').textContent = isDoctor
-        ? 'Sign In as Doctor'
-        : 'Sign In as Patient';
-      document.getElementById('message').textContent = '';
+    <div class="status-pills">
+      <div class="status-pill">
+        <span class="status-dot-green"></span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        <span>Clinical & Diagnostics:</span>
+        <span class="val-green">99.98% Active</span>
+      </div>
+
+      <div class="status-pill">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 2v7.31L4.69 17.5A2 2 0 0 0 6.38 20h11.24a2 2 0 0 0 1.69-2.5L14 9.31V2" />
+        </svg>
+        <span>Lab & EHR Cluster:</span>
+        <span class="val-blue">Synchronized</span>
+      </div>
+
+      <div class="status-pill">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        <span class="val-fips">TLS 1.3 FIPS</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN LOGIN AREA -->
+  <main class="main-wrap">
+    <div class="login-card">
+
+      <!-- LOGO BADGE -->
+      <div class="card-logo-badge">✚</div>
+
+      <!-- BRAND TITLE -->
+      <div class="card-brand-row">
+        <span class="card-brand-name">CarePlus</span>
+      </div>
+
+      <h1 class="card-title">Sign In to Healthcare Portal</h1>
+      <p class="card-subtitle">Unified secure access for Physicians, Patients, and Hospital Care Teams.</p>
+
+      <!-- ERROR ALERT BANNER -->
+      <div id="errorBanner" class="alert-banner alert-error" role="alert">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        <span id="errorMsgText">Invalid email or password.</span>
+      </div>
+
+      <!-- SUCCESS ALERT BANNER -->
+      <div id="successBanner" class="alert-banner alert-success" role="status">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <div>
+          <div id="successTitle" style="font-weight:700;">Login Successful!</div>
+          <div id="successSubtitle" style="font-size:11px; font-weight:500;">Redirecting to your workspace…</div>
+        </div>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <form id="unifiedLoginForm" class="login-form" autocomplete="on" novalidate>
+
+        <!-- EMAIL / WORK ID -->
+        <div class="form-group">
+          <label for="email" class="form-label">WORK EMAIL OR HEALTHCARE ID</label>
+          <div class="input-wrapper">
+            <span class="input-icon-prefix">@</span>
+            <input type="text" id="email" name="email" class="input-control" placeholder="admin@careplus.com"
+              value="admin@careplus.com" required autocomplete="username" />
+          </div>
+        </div>
+
+        <!-- PASSWORD -->
+        <div class="form-group">
+          <div class="form-label-row">
+            <label for="password" class="form-label">PASSWORD</label>
+            <a href="javascript:void(0)" class="forgot-link" onclick="handleForgotPassword()">Forgot Password?</a>
+          </div>
+          <div class="input-wrapper">
+            <span class="input-icon-prefix">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </span>
+            <input type="password" id="password" name="password" class="input-control" placeholder="••••••••••••"
+              value="Admin@123" required autocomplete="current-password" />
+            <button type="button" class="btn-toggle-eye" id="togglePasswordBtn" title="Toggle password visibility"
+              aria-label="Toggle password visibility">
+              <svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <svg id="eyeOffIcon" style="display:none;" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- REMEMBER & 2FA -->
+        <div class="options-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="rememberMe" class="custom-checkbox" checked />
+            <span>Remember this workstation (30d)</span>
+          </label>
+          <div class="badge-2fa">2FA Enforced</div>
+        </div>
+
+        <!-- SIGN IN BUTTON -->
+        <button type="submit" class="btn-submit" id="submitBtn">
+          <span class="spinner" id="btnSpinner"></span>
+          <span id="btnText">Sign In to Portal</span>
+          <span id="btnArrow">→</span>
+        </button>
+
+      </form>
+
+      <!-- STANDARD FRAPPE CONSOLE LINK -->
+      <div class="console-link-wrap">
+        <a href="/app" class="console-link">
+          <span>⚙</span> Standard Frappe / Admin Console
+        </a>
+      </div>
+
+      <!-- QUICK DEMO LOGINS SECTION -->
+      <section class="demo-section">
+        <div class="demo-header">
+          <div class="demo-title-group">
+            <span class="demo-dot-green"></span>
+            <span>QUICK DEMO LOGINS</span>
+          </div>
+          <span class="demo-hint">Click persona to autofill</span>
+        </div>
+
+        <div class="demo-grid">
+
+          <!-- PERSONA 1: ADMIN -->
+          <div class="demo-card demo-item" data-email="admin@careplus.com" data-password="Admin@123"
+            data-role="Hospital Admin" onclick="fillCredentials('admin@careplus.com', 'Admin@123', 'Hospital Admin')">
+            <div class="demo-card-top">
+              <span class="demo-role-badge badge-role-admin">Admin</span>
+              <span class="demo-icon-sm">🏛️</span>
+            </div>
+            <div class="demo-persona-name">Hospital Admin</div>
+            <div class="demo-persona-email">admin@careplus.com</div>
+          </div>
+
+          <!-- PERSONA 2: CLINICAL / DOCTOR -->
+          <div class="demo-card demo-item" data-email="amali@gmail.com" data-password="Doctor@123" data-role="Doctor"
+            onclick="fillCredentials('amali@gmail.com', 'Doctor@123', 'Doctor')">
+            <div class="demo-card-top">
+              <span class="demo-role-badge badge-role-clinical">Clinical</span>
+              <span class="demo-icon-sm">🩺</span>
+            </div>
+            <div class="demo-persona-name">Dr. Amali</div>
+            <div class="demo-persona-email">amali@gmail.com</div>
+          </div>
+
+          <!-- PERSONA 3: PATIENT -->
+          <div class="demo-card demo-item" data-email="tharun@gmail.com" data-password="Patient@123" data-role="Patient"
+            onclick="fillCredentials('tharun@gmail.com', 'Patient@123', 'Patient')">
+            <div class="demo-card-top">
+              <span class="demo-role-badge badge-role-patient">Patient</span>
+              <span class="demo-icon-sm">🤍</span>
+            </div>
+            <div class="demo-persona-name">Tharun K.</div>
+            <div class="demo-persona-email">tharun@gmail.com</div>
+          </div>
+
+        </div>
+
+        <!-- ADDITIONAL DESKS (PHARMACY & BILLING) -->
+        <div class="more-roles-toggle">
+          <button type="button" class="btn-more-roles" onclick="toggleExtraRoles(this)">
+            + More Staff Personas (Pharmacy & Billing)
+          </button>
+        </div>
+
+        <div id="extraRolesGrid" class="extra-roles-grid">
+          <div class="demo-card demo-item" data-email="pharmacy@careplus.com" data-password="Pharmacy@123"
+            data-role="Pharmacist" onclick="fillCredentials('pharmacy@careplus.com', 'Pharmacy@123', 'Pharmacist')">
+            <div class="demo-card-top">
+              <span class="demo-role-badge badge-role-pharmacy">Pharmacy</span>
+              <span class="demo-icon-sm">💊</span>
+            </div>
+            <div class="demo-persona-name">Pharmacy Desk</div>
+            <div class="demo-persona-email">pharmacy@careplus.com</div>
+          </div>
+
+          <div class="demo-card demo-item" data-email="billing@careplus.com" data-password="Billing@123"
+            data-role="Billing Staff" onclick="fillCredentials('billing@careplus.com', 'Billing@123', 'Billing Staff')">
+            <div class="demo-card-top">
+              <span class="demo-role-badge badge-role-billing">Billing</span>
+              <span class="demo-icon-sm">💳</span>
+            </div>
+            <div class="demo-persona-name">Billing & Cashier</div>
+            <div class="demo-persona-email">billing@careplus.com</div>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- BOTTOM FOOTER -->
+  <footer class="bottom-footer">
+    <div class="cert-items">
+      <div class="cert-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        <span>HIPAA & HITECH Compliant</span>
+      </div>
+      <span class="cert-divider">•</span>
+      <div class="cert-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        <span>256-bit AES Encryption</span>
+      </div>
+      <span class="cert-divider">•</span>
+      <div class="cert-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <span>SOC2 Type II Certified</span>
+      </div>
+    </div>
+
+    <div class="copyright-text">
+      © 2025 CarePlus Health Systems Inc. All rights reserved.
+    </div>
+  </footer>
+
+  <!-- AUTHENTICATION SCRIPT -->
+  <script>
+    // 1. Password Visibility Toggle
+    const passwordInput = document.getElementById('password');
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+    const eyeIcon = document.getElementById('eyeIcon');
+    const eyeOffIcon = document.getElementById('eyeOffIcon');
+
+    togglePasswordBtn.addEventListener('click', function () {
+      const isPassword = passwordInput.type === 'password';
+      passwordInput.type = isPassword ? 'text' : 'password';
+      eyeIcon.style.display = isPassword ? 'none' : 'block';
+      eyeOffIcon.style.display = isPassword ? 'block' : 'none';
+      passwordInput.focus();
+    });
+
+    // 2. Demo Credentials Autofill Helper
+    function fillCredentials(email, pwd, role) {
+      const emailField = document.getElementById('email');
+      const pwdField = document.getElementById('password');
+      if (emailField) {
+        emailField.value = email;
+        emailField.dispatchEvent(new Event('input', { bubbles: true }));
+        emailField.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (pwdField) {
+        pwdField.value = pwd;
+        pwdField.dispatchEvent(new Event('input', { bubbles: true }));
+        pwdField.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      hideError();
+      const submitBtn = document.getElementById('submitBtn');
+      if (submitBtn) {
+        submitBtn.style.transform = 'scale(0.98)';
+        setTimeout(() => submitBtn.style.transform = '', 150);
+      }
+      if (emailField) emailField.focus();
     }
 
-    document.getElementById('loginForm').addEventListener('submit', async function(event) {
-      event.preventDefault();
-      const usr = document.getElementById('email').value.trim();
-      const pwd = document.getElementById('password').value;
-      const msg = document.getElementById('message');
-      const btn = document.getElementById('loginButton');
+    function toggleExtraRoles(btn) {
+      const grid = document.getElementById('extraRolesGrid');
+      if (grid) {
+        grid.classList.toggle('open');
+        btn.textContent = grid.classList.contains('open')
+          ? '− Hide Additional Personas'
+          : '+ More Staff Personas (Pharmacy & Billing)';
+      }
+    }
 
-      btn.disabled = true;
-      btn.textContent = 'Signing in…';
-      msg.textContent = '';
+    function handleForgotPassword() {
+      alert('To reset your password, please contact the CarePlus Hospital IT Administrator or use your internal Active Directory portal.');
+    }
+
+    // 3. UI Helpers
+    function showError(msg) {
+      const banner = document.getElementById('errorBanner');
+      const text = document.getElementById('errorMsgText');
+      text.textContent = msg || 'Invalid email or password.';
+      banner.classList.add('active');
+
+      const successBanner = document.getElementById('successBanner');
+      successBanner.classList.remove('active');
+    }
+
+    function hideError() {
+      const banner = document.getElementById('errorBanner');
+      banner.classList.remove('active');
+    }
+
+    function showSuccess(role, redirectUrl) {
+      hideError();
+      const successBanner = document.getElementById('successBanner');
+      if (successBanner) {
+        const title = document.getElementById('successTitle');
+        const sub = document.getElementById('successSubtitle');
+        if (title) title.textContent = `Authenticated as ${role || 'User'}!`;
+        if (sub) sub.textContent = 'Redirecting to your dashboard…';
+        successBanner.classList.add('active');
+      }
+
+      const btnText = document.getElementById('btnText');
+      if (btnText) btnText.textContent = 'Verified! Entering Portal…';
+
+      let dest = redirectUrl;
+      if (!dest) {
+        const email = document.getElementById('email').value.trim();
+        if (email.toLowerCase() === 'administrator' || email.toLowerCase().includes('admin') || role === 'Hospital Admin') dest = '/admin_dashboard';
+        else if (email.includes('pharmacy') || role === 'Pharmacist') dest = '/pharmacy_dashboard';
+        else if (email.includes('billing') || role === 'Billing Staff') dest = '/billing';
+        else if (email.includes('amali') || email.includes('doctor') || role === 'Doctor') dest = '/doctor_dashboard';
+        else dest = '/patient_dashboard';
+      }
+      setTimeout(() => {
+        window.location.replace(dest);
+      }, 300);
+    }
+
+    function setLoading(isLoading) {
+      const btn = document.getElementById('submitBtn');
+      const spinner = document.getElementById('btnSpinner');
+      const text = document.getElementById('btnText');
+      const arrow = document.getElementById('btnArrow');
+
+      btn.disabled = isLoading;
+      if (isLoading) {
+        spinner.style.display = 'inline-block';
+        arrow.style.display = 'none';
+        text.textContent = 'Signing In…';
+      } else {
+        spinner.style.display = 'none';
+        arrow.style.display = 'inline';
+        text.textContent = 'Sign In to Portal';
+      }
+    }
+
+    // 4. Form Submission & Unified Login Handling
+    document.getElementById('unifiedLoginForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      hideError();
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!email || !password) {
+        showError('Please enter both your work email and password.');
+        return;
+      }
+
+      setLoading(true);
 
       try {
-        const response = await fetch('/api/method/login', {
+        const response = await fetch('/api/method/hospital_management.api.unified_login', {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json' 
+            'Accept': 'application/json'
           },
-          body: JSON.stringify({ usr: usr, pwd: pwd })
+          body: JSON.stringify({ usr: email, pwd: password })
         });
 
-        const data = await response.json();
+        const r = await response.json();
+        const resp = r.message || r;
 
-        if (response.ok && data.message === 'Logged In') {
-          msg.style.color = '#4ade80';
-          msg.textContent = '✅ Login successful! Redirecting…';
+        if (response.ok && (resp.success === true || resp.status === 'success' || resp.redirect_to || (resp.message && resp.message.redirect_to))) {
+          const target = resp.redirect_to || (resp.message && resp.message.redirect_to) || (function () {
+            const email = document.getElementById('email').value.trim();
+            if (email.toLowerCase() === 'administrator' || email.toLowerCase().includes('admin')) return '/admin_dashboard';
+            if (email.includes('pharmacy')) return '/pharmacy_dashboard';
+            else if (email.includes('billing')) return '/billing';
+            else if (email.includes('amali') || email.includes('doctor')) return '/doctor_dashboard';
+            else return '/patient_dashboard';
+          })();
 
-          setTimeout(() => {
-            if (currentRole === 'doctor') {
-              window.location.href = '/doctor_dashboard';
-            } else {
-              window.location.href = '/patient_dashboard';
-            }
-          }, 300);
+          showSuccess(resp.role, target);
         } else {
-          btn.disabled = false;
-          btn.textContent = currentRole === 'doctor' ? 'Sign In as Doctor' : 'Sign In as Patient';
-          msg.style.color = '#f87171';
-          msg.textContent = '❌ Invalid email or password.';
+          setLoading(false);
+          const errorMsg = (resp && typeof resp.message === 'string' && resp.message) || (resp && resp.message && resp.message.message) || (r && r.message && r.message.message) || 'Invalid email or password.';
+          showError(errorMsg);
         }
       } catch (err) {
-        btn.disabled = false;
-        btn.textContent = currentRole === 'doctor' ? 'Sign In as Doctor' : 'Sign In as Patient';
-        msg.style.color = '#f87171';
-        msg.textContent = '⚠️ Network error during login.';
-        console.error(err);
+        console.error('Unified login error:', err);
+        setLoading(false);
+        showError('A network or server communication error occurred. Please try again.');
       }
     });
   </script>
 </body>
+
 </html>

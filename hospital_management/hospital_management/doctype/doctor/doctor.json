@@ -3,7 +3,7 @@
  "allow_bulk_edit": 1,
  "allow_rename": 1,
  "autoname": "field:doctor_name",
- "creation": "2026-10-10 12:22:12.357090",
+ "creation": "2026-10-23 10:55:51.474998",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -21,7 +21,8 @@
   "slot_duration_mins",
   "break_start_time",
   "break_end_time",
-  "working_days"
+  "working_days",
+  "user_id"
  ],
  "fields": [
   {
@@ -32,13 +33,15 @@
    "fieldname": "doctor_name",
    "fieldtype": "Data",
    "label": "Doctor Name",
+   "reqd": 1,
    "unique": 1
   },
   {
    "fieldname": "department",
    "fieldtype": "Link",
    "label": "Department",
-   "options": "Departments"
+   "options": "Departments",
+   "reqd": 1
   },
   {
    "fieldname": "specialization",
@@ -49,12 +52,15 @@
   {
    "fieldname": "phone",
    "fieldtype": "Phone",
-   "label": "Phone"
+   "label": "Phone",
+   "reqd": 1
   },
   {
    "fieldname": "email",
    "fieldtype": "Data",
-   "label": "Email"
+   "in_list_view": 1,
+   "label": "Email",
+   "reqd": 1
   },
   {
    "fieldname": "consultation_fee",
@@ -73,46 +79,52 @@
    "label": "Working Schedule & Shift Configuration"
   },
   {
+   "default": "09:00:00",
    "fieldname": "shift_start_time",
    "fieldtype": "Time",
-   "label": "Shift Start Time",
-   "default": "09:00:00"
+   "label": "Shift Start Time"
   },
   {
+   "default": "18:00:00",
    "fieldname": "shift_end_time",
    "fieldtype": "Time",
-   "label": "Shift End Time",
-   "default": "18:00:00"
+   "label": "Shift End Time"
   },
   {
+   "default": "30",
    "fieldname": "slot_duration_mins",
    "fieldtype": "Int",
-   "label": "Slot Duration (Minutes)",
-   "default": "30"
+   "label": "Slot Duration (Minutes)"
   },
   {
+   "default": "13:00:00",
    "fieldname": "break_start_time",
    "fieldtype": "Time",
-   "label": "Break Start Time",
-   "default": "13:00:00"
+   "label": "Break Start Time"
   },
   {
+   "default": "14:00:00",
    "fieldname": "break_end_time",
    "fieldtype": "Time",
-   "label": "Break End Time",
-   "default": "14:00:00"
+   "label": "Break End Time"
   },
   {
+   "default": "Monday, Tuesday, Wednesday, Thursday, Friday, Saturday",
    "fieldname": "working_days",
    "fieldtype": "Data",
-   "label": "Available Working Days",
-   "default": "Monday, Tuesday, Wednesday, Thursday, Friday, Saturday"
+   "label": "Available Working Days"
+  },
+  {
+   "fieldname": "user_id",
+   "fieldtype": "Link",
+   "label": "Linked User Account",
+   "options": "User"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-10 15:46:28.825630",
+ "modified": "2026-10-27 09:58:13.597877",
  "modified_by": "Administrator",
  "module": "Hospital Management",
  "name": "Doctor",
@@ -122,14 +134,40 @@
   {
    "create": 1,
    "delete": 1,
-   "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
    "role": "System Manager",
-   "share": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Hospital Administrator",
+   "write": 1
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "role": "doctor",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Nurse"
+  },
+  {
+   "read": 1,
+   "role": "patient"
+  },
+  {
+   "read": 1,
+   "role": "Pharmacy Staff"
   }
  ],
  "row_format": "Dynamic",

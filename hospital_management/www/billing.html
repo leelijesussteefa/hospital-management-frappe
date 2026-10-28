@@ -4,6 +4,91 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CarePlus | Hospital Billing & Invoicing</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <script>
+    (function initSessionGuard() {
+        // 1. Immediate server-rendered session validation
+        const sessionUser = "{{ frappe.session.user }}";
+        if (!sessionUser || sessionUser === "Guest") {
+            window.history.replaceState(null, document.title, '/frontend');
+            window.location.replace('/frontend');
+            return;
+        }
+
+        // Replace current state so back navigation cannot freely reopen authenticated dashboard pages without valid credentials
+        window.history.replaceState(null, document.title, window.location.href);
+
+        // 2. Client-side session verification against backend API
+        async function checkAuthSession() {
+            try {
+                const res = await fetch('/api/method/hospital_management.api.check_session', {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    },
+                    cache: 'no-store'
+                });
+                if (!res.ok) {
+                    window.history.replaceState(null, document.title, '/frontend');
+                    window.location.replace('/frontend');
+                    return;
+                }
+                const data = await res.json();
+                const info = (data && data.message) ? data.message : data;
+                if (!info || info.status === 'unauthenticated' || !info.user || info.user === 'Guest') {
+                    window.history.replaceState(null, document.title, '/frontend');
+                    window.location.replace('/frontend');
+                }
+            } catch (err) {
+                console.warn('Session verification error:', err);
+            }
+        }
+        window.checkAuthSession = checkAuthSession;
+
+        // 3. Initial page load validation
+        checkAuthSession();
+
+        // 4. Prevent Browser Back-Forward Cache (bfcache)
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                // If restored from back-forward cache, verify active session
+                checkAuthSession();
+            }
+        });
+
+        // 5. Enforce history lock and validate on popstate (back navigation)
+        function lockNavigation() {
+            window.history.pushState(null, document.title, window.location.href);
+        }
+        lockNavigation();
+
+        window.addEventListener('popstate', function (event) {
+            checkAuthSession();
+            lockNavigation();
+        });
+
+        // 6. Trap Backspace on non-input elements
+        window.addEventListener('keydown', function (e) {
+            if (e.key === 'Backspace' || e.keyCode === 8) {
+                const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+                const isEditable = document.activeElement && (
+                    document.activeElement.isContentEditable ||
+                    tag === 'input' ||
+                    tag === 'textarea' ||
+                    tag === 'select'
+                );
+                if (!isEditable) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }
+        }, true);
+    })();
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -39,6 +124,45 @@
       display: flex;
       flex-direction: column;
       overflow-x: hidden;
+    }
+
+    /* REFRESH BUTTON & ROTATION KEYFRAMES */
+    @keyframes spinRefresh {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .refresh-icon {
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+
+    .refresh-spin, .fa-spin {
+      display: inline-block;
+      animation: spinRefresh 0.75s linear infinite !important;
+      transform-origin: center center;
+    }
+
+    #btnRefreshBilling {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+    }
+
+    #btnRefreshBilling:hover:not(:disabled) .refresh-icon {
+      transform: rotate(45deg);
+    }
+
+    #btnRefreshBilling:disabled,
+    #btnRefreshBilling.btn-refreshing {
+      opacity: 0.65;
+      cursor: not-allowed !important;
+      pointer-events: none;
     }
 
     /* TOP NAVBAR */
@@ -853,6 +977,223 @@
         padding: 0 !important;
       }
     }
+      .text-center { text-align: center; }
+    .p-6 { padding: 24px 16px; }
+    .text-gray-400 { color: #94a3b8; }
+
+    /* CAREPLUS REUSABLE NOTIFICATION / CONFIRMATION MODAL & TOAST SYSTEM */
+    .careplus-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 14, 26, 0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: cpFadeIn 0.25s ease-out;
+    }
+    @keyframes cpFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .careplus-modal-card {
+      position: relative;
+      background: linear-gradient(145deg, rgba(20, 27, 45, 0.95), rgba(13, 19, 33, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(99, 102, 241, 0.18);
+      border-radius: 20px;
+      width: min(440px, 94vw);
+      padding: 32px 28px 24px;
+      text-align: center;
+      overflow: hidden;
+      animation: cpScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes cpScaleUp {
+      from { transform: scale(0.92) translateY(12px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .careplus-modal-glow {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 220px;
+      height: 60px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .careplus-modal-header-icon {
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.25));
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+    }
+    .careplus-modal-header-icon.danger {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(225, 29, 72, 0.3));
+      border-color: rgba(244, 63, 94, 0.45);
+      box-shadow: 0 8px 24px rgba(244, 63, 94, 0.35);
+    }
+    .careplus-modal-header-icon.success {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.3));
+      border-color: rgba(16, 185, 129, 0.45);
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+    }
+    .careplus-modal-title {
+      font-size: 19px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin: 0 0 8px;
+      letter-spacing: -0.3px;
+    }
+    .careplus-modal-desc {
+      font-size: 14px;
+      color: #cbd5e1;
+      line-height: 1.55;
+      margin: 0 0 6px;
+    }
+    .careplus-modal-subtext {
+      font-size: 12.5px;
+      color: #94a3b8;
+      line-height: 1.45;
+      margin: 0 0 24px;
+    }
+    .careplus-modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .careplus-btn-cancel {
+      flex: 1;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 600;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .careplus-btn-cancel:hover {
+      background: rgba(51, 65, 85, 0.9);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .careplus-btn-confirm {
+      flex: 1;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+      transition: all 0.2s ease;
+    }
+    .careplus-btn-confirm:hover {
+      background: linear-gradient(135deg, #818cf8, #6366f1);
+      box-shadow: 0 6px 22px rgba(99, 102, 241, 0.6);
+      transform: translateY(-1px);
+    }
+    .careplus-btn-confirm.danger {
+      background: linear-gradient(135deg, #f43f5e, #e11d48);
+      box-shadow: 0 4px 16px rgba(244, 63, 94, 0.4);
+    }
+    .careplus-btn-confirm.danger:hover {
+      background: linear-gradient(135deg, #fb7185, #f43f5e);
+      box-shadow: 0 6px 22px rgba(244, 63, 94, 0.6);
+    }
+    .careplus-btn-confirm.success {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+    }
+    .careplus-btn-confirm.success:hover {
+      background: linear-gradient(135deg, #34d399, #10b981);
+      box-shadow: 0 6px 22px rgba(16, 185, 129, 0.6);
+    }
+
+    /* TOP-RIGHT FLOATING TOAST NOTIFICATIONS */
+    .careplus-toast-container {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 10001;
+      pointer-events: none;
+    }
+    .careplus-toast {
+      pointer-events: auto;
+      min-width: 300px;
+      max-width: 420px;
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(99, 102, 241, 0.15);
+      border-radius: 14px;
+      padding: 14px 18px;
+      color: #fff;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      animation: cpToastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.3s ease;
+    }
+    @keyframes cpToastSlideIn {
+      from { transform: translateX(40px) scale(0.95); opacity: 0; }
+      to { transform: translateX(0) scale(1); opacity: 1; }
+    }
+    .careplus-toast-icon {
+      font-size: 20px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .careplus-toast-body {
+      flex: 1;
+    }
+    .careplus-toast-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 2px;
+    }
+    .careplus-toast-msg {
+      font-size: 12.5px;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+    .careplus-toast.success {
+      border-color: rgba(16, 185, 129, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(16, 185, 129, 0.2);
+    }
+    .careplus-toast.success .careplus-toast-title { color: #34d399; }
+    .careplus-toast.warning {
+      border-color: rgba(245, 158, 11, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(245, 158, 11, 0.2);
+    }
+    .careplus-toast.warning .careplus-toast-title { color: #fbbf24; }
+    .careplus-toast.error {
+      border-color: rgba(244, 63, 94, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(244, 63, 94, 0.2);
+    }
+    .careplus-toast.error .careplus-toast-title { color: #fda4af; }
+
   </style>
 </head>
 <body>
@@ -867,9 +1208,11 @@
       </div>
     </a>
     <div class="nav-actions">
-      <a href="/doctor_dashboard" class="btn btn-outline">🩺 Doctor Portal</a>
-      <a href="/patient_dashboard" class="btn btn-outline">🧑 Patient Portal</a>
       <button onclick="openCreateInvoiceModal()" class="btn btn-primary">+ New Custom Bill</button>
+      <button id="btnRefreshBilling" onclick="handleRefreshBillingClick()" class="btn btn-outline" title="Refresh Live Billing Data">
+        <span id="refreshIcon" class="refresh-icon">🔄</span>
+        <span id="refreshText">Refresh Data</span>
+      </button>
       <button onclick="confirmAndLogout()" class="btn btn-outline" style="color:var(--rose)">⏻ Logout</button>
     </div>
   </header>
@@ -882,9 +1225,6 @@
       <div class="header-info">
         <h2>💳 Hospital Billing & Invoices</h2>
         <p>Manage consultation charges, pharmacy billing, payment collections, and printable slips.</p>
-      </div>
-      <div>
-        <button onclick="loadInvoices()" class="btn btn-outline">🔄 Refresh Data</button>
       </div>
     </div>
 
@@ -1069,13 +1409,13 @@
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
             <div class="form-group">
               <label>Patient *</label>
-              <select id="custPatientSelect" class="form-control" required>
+              <select id="patient_select" name="patient" class="form-control" required>
                 <option value="">-- Choose Patient --</option>
               </select>
             </div>
             <div class="form-group">
               <label>Doctor (Optional)</label>
-              <select id="custDoctorSelect" class="form-control">
+              <select id="doctor_select" name="doctor" class="form-control" onchange="handleDoctorChange()">
                 <option value="">-- Choose Doctor --</option>
               </select>
             </div>
@@ -1117,54 +1457,249 @@
 
   <!-- JAVASCRIPT LOGIC -->
   <script>
-    let allInvoices = [];
+
+    // ─────────────────────────────────────────────
+    // CarePlus Modal & Toast Notification System
+    // ─────────────────────────────────────────────
+    let _careplusConfirmResolver = null;
+
+    function showCarePlusConfirm({
+      title = "Confirm Action",
+      message = "Are you sure you want to proceed?",
+      subtext = "",
+      icon = "🔔",
+      confirmText = "Confirm",
+      cancelText = "Cancel",
+      type = "primary"
+    } = {}) {
+      return new Promise((resolve) => {
+        _careplusConfirmResolver = resolve;
+
+        const modal = document.getElementById("careplusConfirmModalBackdrop");
+        const iconEl = document.getElementById("careplusModalIcon");
+        const titleEl = document.getElementById("careplusModalTitle");
+        const descEl = document.getElementById("careplusModalDesc");
+        const subtextEl = document.getElementById("careplusModalSubtext");
+        const confirmBtn = document.getElementById("careplusModalConfirmBtn");
+        const cancelBtn = document.getElementById("careplusModalCancelBtn");
+
+        if (iconEl) {
+          iconEl.textContent = icon;
+          iconEl.className = "careplus-modal-header-icon " + (type === 'danger' ? 'danger' : (type === 'success' ? 'success' : ''));
+        }
+        if (titleEl) titleEl.textContent = title;
+        if (descEl) descEl.innerHTML = message;
+        if (subtextEl) {
+          subtextEl.textContent = subtext;
+          subtextEl.style.display = subtext ? "block" : "none";
+        }
+        if (confirmBtn) {
+          confirmBtn.textContent = confirmText;
+          confirmBtn.className = "careplus-btn-confirm " + (type === 'danger' ? 'danger' : (type === 'success' ? 'success' : ''));
+        }
+        if (cancelBtn) {
+          cancelBtn.textContent = cancelText;
+          cancelBtn.style.display = cancelText ? "inline-block" : "none";
+        }
+
+        if (modal) modal.style.display = "flex";
+      });
+    }
+    window.showCarePlusConfirm = showCarePlusConfirm;
+
+    function resolveCareplusConfirm(val) {
+      const modal = document.getElementById("careplusConfirmModalBackdrop");
+      if (modal) modal.style.display = "none";
+      if (_careplusConfirmResolver) {
+        _careplusConfirmResolver(val);
+        _careplusConfirmResolver = null;
+      }
+    }
+    window.resolveCareplusConfirm = resolveCareplusConfirm;
+
+    function handleCareplusModalBackdrop(e) {
+      if (e.target && e.target.id === "careplusConfirmModalBackdrop") {
+        resolveCareplusConfirm(false);
+      }
+    }
+    window.handleCareplusModalBackdrop = handleCareplusModalBackdrop;
+
+    function showCarePlusToast(message, type = "success", title = "") {
+      let container = document.getElementById("careplusToastContainer");
+      if (!container) {
+        container = document.createElement("div");
+        container.id = "careplusToastContainer";
+        container.className = "careplus-toast-container";
+        document.body.appendChild(container);
+      }
+
+      const defaultTitles = {
+        success: "Success",
+        warning: "Attention",
+        error: "Alert",
+        info: "Notice"
+      };
+      const icons = {
+        success: "✓",
+        warning: "⚠️",
+        error: "✕",
+        info: "ℹ️"
+      };
+
+      const toastTitle = title || defaultTitles[type] || "Notification";
+      const icon = icons[type] || "🔔";
+
+      const t = document.createElement("div");
+      t.className = `careplus-toast ${type}`;
+      t.innerHTML = `
+        <div class="careplus-toast-icon">${icon}</div>
+        <div class="careplus-toast-body">
+          <div class="careplus-toast-title">${escapeHtml(toastTitle)}</div>
+          <div class="careplus-toast-msg">${message}</div>
+        </div>
+      `;
+      container.appendChild(t);
+
+      setTimeout(() => {
+        t.style.opacity = "0";
+        t.style.transform = "translateX(30px) scale(0.95)";
+        setTimeout(() => t.remove(), 300);
+      }, 3000);
+    }
+    window.showCarePlusToast = showCarePlusToast;
+
+    // Override window.alert to completely prevent default browser alert dialogs
+    window.alert = function(msg) {
+      showCarePlusToast(typeof msg === "object" ? JSON.stringify(msg) : String(msg), "warning", "Notice");
+    };
+
+        let allInvoices = [];
     let currentStatusFilter = 'All';
 
     // ─────────────────────────────────────────────
     // 1. Load Invoices & Metrics from API
     // ─────────────────────────────────────────────
     async function loadInvoices() {
-      const fromDate = document.getElementById('dateFilterFrom').value;
-      const toDate = document.getElementById('dateFilterTo').value;
+      const fromDate = document.getElementById('dateFilterFrom') ? document.getElementById('dateFilterFrom').value : '';
+      const toDate = document.getElementById('dateFilterTo') ? document.getElementById('dateFilterTo').value : '';
 
       let url = `/api/method/hospital_management.api.get_invoices?status=${encodeURIComponent(currentStatusFilter)}`;
       if (fromDate) url += `&from_date=${encodeURIComponent(fromDate)}`;
       if (toDate) url += `&to_date=${encodeURIComponent(toDate)}`;
 
       try {
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.message && data.message.status === 'success') {
-          allInvoices = data.message.invoices || [];
-          updateKPIs(data.message.metrics);
-          renderInvoicesTable(allInvoices);
-        } else {
-          document.getElementById('invoicesTableBody').innerHTML = `
-            <tr><td colspan="8" class="state-message"><div class="icon">⚠️</div><p>${data.message ? data.message.message : 'Error loading invoices'}</p></td></tr>
-          `;
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          },
+          cache: 'no-store'
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to fetch invoices`);
         }
+        const res = await response.json();
+
+        const invoices = (res.message && res.message.invoices) ? res.message.invoices : (Array.isArray(res.message) ? res.message : []);
+        const metrics = (res.message && res.message.metrics) ? res.message.metrics : { total_billed: 0, total_collected: 0, outstanding: 0, count: 0 };
+
+        allInvoices = invoices;
+        updateKPIs(metrics);
+
+        const q = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
+        if (q) {
+          filterInvoicesLocally();
+        } else {
+          renderInvoicesTable(allInvoices);
+        }
+        return { invoices, metrics };
       } catch (err) {
         console.error('Error fetching invoices:', err);
-        document.getElementById('invoicesTableBody').innerHTML = `
-          <tr><td colspan="8" class="state-message"><div class="icon">⚠️</div><p>Failed to connect to billing server.</p></td></tr>
-        `;
+        updateKPIs({ total_billed: 0, total_collected: 0, outstanding: 0, count: 0 });
+        const tbody = document.getElementById('invoicesTableBody');
+        if (tbody) {
+          tbody.innerHTML = `<tr class="text-center"><td colspan="8" class="p-6 text-gray-400">No invoices found.</td></tr>`;
+        }
+        throw err;
       }
     }
+
+    async function handleRefreshBillingClick() {
+      const btn = document.getElementById('btnRefreshBilling');
+      const icon = document.getElementById('refreshIcon');
+      const text = document.getElementById('refreshText');
+
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add('btn-refreshing');
+      }
+      if (icon) {
+        icon.classList.add('refresh-spin', 'fa-spin');
+      }
+      if (text) {
+        text.textContent = 'Refreshing...';
+      }
+
+      try {
+        const startTime = Date.now();
+        await loadInvoices();
+
+        // Ensure visible spin animation (at least 350ms) for responsive visual feedback
+        const elapsed = Date.now() - startTime;
+        if (elapsed < 350) {
+          await new Promise(resolve => setTimeout(resolve, 350 - elapsed));
+        }
+
+        showCarePlusToast('Billing records and metrics refreshed successfully!', 'success', 'Refreshed');
+      } catch (err) {
+        console.error('Refresh error:', err);
+        const errMsg = (err && err.message) ? err.message : 'Error fetching live billing data.';
+        showCarePlusToast(errMsg, 'error', 'Refresh Failed');
+      } finally {
+        if (icon) {
+          icon.classList.remove('refresh-spin', 'fa-spin');
+        }
+        if (text) {
+          text.textContent = 'Refresh Data';
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.classList.remove('btn-refreshing');
+        }
+      }
+    }
+    window.handleRefreshBillingClick = handleRefreshBillingClick;
+    window.refreshBillingData = handleRefreshBillingClick;
 
     // ─────────────────────────────────────────────
     // 2. Update KPI Metrics Bar
     // ─────────────────────────────────────────────
     function updateKPIs(metrics) {
-      if (!metrics) return;
-      document.getElementById('kpiBilled').textContent = '₹' + (metrics.total_billed || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-      document.getElementById('kpiCollected').textContent = '₹' + (metrics.total_collected || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-      document.getElementById('kpiOutstanding').textContent = '₹' + (metrics.total_outstanding || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      if (!metrics) metrics = { total_billed: 0, total_collected: 0, outstanding: 0, count: 0 };
+
+      const billed = Number(metrics.total_billed || 0);
+      const collected = Number(metrics.total_collected || 0);
+      const outstanding = Number(metrics.outstanding !== undefined ? metrics.outstanding : (metrics.total_outstanding || 0));
+      const count = Number(metrics.count !== undefined ? metrics.count : (allInvoices ? allInvoices.length : 0));
+
+      const billedEl = document.getElementById('kpiBilled');
+      if (billedEl) billedEl.textContent = '₹' + billed.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+      const collectedEl = document.getElementById('kpiCollected');
+      if (collectedEl) collectedEl.textContent = '₹' + collected.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+      const outstandingEl = document.getElementById('kpiOutstanding');
+      if (outstandingEl) outstandingEl.textContent = '₹' + outstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 });
       
+      const totalInvoicesEl = document.getElementById('kpiTotalInvoices');
+      if (totalInvoicesEl) totalInvoicesEl.textContent = count;
+
       const counts = metrics.counts || {};
-      document.getElementById('kpiTotalInvoices').textContent = counts.total || 0;
-      document.getElementById('kpiPaidCount').textContent = counts.paid || 0;
-      document.getElementById('kpiUnpaidCount').textContent = (counts.unpaid || 0) + (counts.partially_paid || 0);
+      const paidEl = document.getElementById('kpiPaidCount');
+      if (paidEl) paidEl.textContent = counts.paid !== undefined ? counts.paid : (allInvoices.filter(i => (i.payment_status || i.status) === 'Paid').length);
+      const unpaidEl = document.getElementById('kpiUnpaidCount');
+      if (unpaidEl) unpaidEl.textContent = counts.unpaid !== undefined ? ((counts.unpaid || 0) + (counts.partially_paid || 0)) : (allInvoices.filter(i => (i.payment_status || i.status) !== 'Paid').length);
     }
 
     // ─────────────────────────────────────────────
@@ -1172,23 +1707,24 @@
     // ─────────────────────────────────────────────
     function renderInvoicesTable(invoices) {
       const tbody = document.getElementById('invoicesTableBody');
+      if (!tbody) return;
+
       if (!invoices || invoices.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="8" class="state-message">
-              <div class="icon">📑</div>
-              <p>No invoices found matching criteria.</p>
-            </td>
-          </tr>
-        `;
+        tbody.innerHTML = `<tr class="text-center"><td colspan="8" class="p-6 text-gray-400">No invoices found.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = invoices.map(inv => {
+        const invId = escapeHtml(inv.name || '');
+        const invDate = escapeHtml(inv.invoice_date || inv.posting_date || '-');
+        const pName = escapeHtml(inv.patient_name || inv.customer_name || inv.patient || inv.customer || 'Unknown Patient');
+        const pPhone = inv.patient_phone ? '📞 ' + escapeHtml(inv.patient_phone) : (inv.patient ? 'ID: ' + escapeHtml(inv.patient) : '');
+        const docName = escapeHtml(inv.doctor_name || inv.doctor || 'Attending Physician');
+
         const grand = Number(inv.grand_total || inv.total_amount || 0);
         const paid = Number(inv.paid_amount || 0);
         const outstanding = Number(inv.outstanding_amount !== undefined ? inv.outstanding_amount : Math.max(0, grand - paid));
-        const status = inv.payment_status || 'Unpaid';
+        const status = escapeHtml(inv.payment_status || inv.status || 'Unpaid');
 
         let badgeClass = 'badge-unpaid';
         if (status === 'Paid') badgeClass = 'badge-paid';
@@ -1318,16 +1854,14 @@
         if (data.message && data.message.status === 'success') {
           closeModal('paymentModal');
           loadInvoices();
-          // Prompt user to view & print the updated receipt
-          if (confirm('✅ Payment recorded successfully! Would you like to view and print the invoice slip now?')) {
-            viewInvoiceSlip(invoiceId);
-          }
+          showCarePlusToast('Payment recorded successfully!', 'success', 'Payment Received');
+          viewInvoiceSlip(invoiceId);
         } else {
-          alert('Payment Failed: ' + ((data.message && data.message.message) || 'Error recording payment'));
+          showCarePlusToast('Payment Failed: ' + ((data.message && data.message.message) || 'Error recording payment'), 'error');
         }
       } catch (err) {
         console.error(err);
-        alert('Network error while processing payment.');
+        showCarePlusToast('Network error while processing payment.', 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = 'Confirm & Record Payment';
@@ -1504,14 +2038,14 @@ Please enter reason for cancellation:`, 'Patient cancelled appointment');
         });
         const data = await res.json();
         if (data.message && data.message.status === 'success') {
-          alert(`Invoice ${invoiceId} cancelled.`);
+          showCarePlusToast(`Invoice ${invoiceId} cancelled successfully.`, 'success', 'Invoice Cancelled');
           loadInvoices();
         } else {
-          alert('Cancel failed: ' + ((data.message && data.message.message) || 'Error'));
+          showCarePlusToast('Cancel failed: ' + ((data.message && data.message.message) || 'Error'), 'error');
         }
       } catch (err) {
         console.error(err);
-        alert('Error cancelling invoice.');
+        showCarePlusToast('Error cancelling invoice.', 'error');
       }
     }
 
@@ -1522,23 +2056,42 @@ Please enter reason for cancellation:`, 'Patient cancelled appointment');
     let availableMedicines = [];
 
     async function openCreateInvoiceModal() {
-      // Load patients and doctors
+      // Load patients and doctors prerequisites
       try {
-        const pRes = await fetch('/api/method/frappe.client.get_list?doctype=Patient&fields=["name","patient_name"]&limit_page_length=100');
-        const pData = await pRes.json();
-        const pSelect = document.getElementById('custPatientSelect');
-        pSelect.innerHTML = '<option value="">-- Choose Patient --</option>';
-        (pData.message || []).forEach(p => {
-          pSelect.innerHTML += `<option value="${p.name}">${escapeHtml(p.patient_name || p.name)} (${p.name})</option>`;
-        });
+        const res = await fetch('/api/method/hospital_management.api.get_billing_prerequisites');
+        const json = await res.json();
+        const data = json.message || json || {};
 
-        const dRes = await fetch('/api/method/hospital_management.api.get_doctors_list');
-        const dData = await dRes.json();
-        const dSelect = document.getElementById('custDoctorSelect');
-        dSelect.innerHTML = '<option value="">-- Choose Doctor (Optional) --</option>';
-        (dData.message || []).forEach(d => {
-          dSelect.innerHTML += `<option value="${d.name}">Dr. ${escapeHtml(d.doctor_name || d.name)} - Fee: ₹${d.consultation_fee || 0}</option>`;
-        });
+        // Populate Patient select box
+        const patientSelect = document.getElementById("patient_select") || document.querySelector("select[name='patient']");
+        if (patientSelect) {
+          patientSelect.innerHTML = '<option value="">-- Choose Patient --</option>';
+          (data.patients || []).forEach(p => {
+              const ipdTag = (p.patient_type === 'Inpatient' || p.ward_type) ? (p.status === 'Discharged' ? ' [IPD Discharged]' : ` [IPD: ${p.room_number || p.ward_type || 'Admitted'}]`) : '';
+              const label = (p.patient_name ? `${p.patient_name} (${p.name})` : p.name) + ipdTag;
+              patientSelect.innerHTML += `<option value="${p.name}" data-type="${p.patient_type || ''}" data-room="${p.room_number || ''}" data-status="${p.status || ''}">${escapeHtml(label)}</option>`;
+          });
+          patientSelect.onchange = handlePatientChange;
+        }
+
+        // Format Doctor select box
+        const doctorSelect = document.getElementById("doctor_select") || document.querySelector("select[name='doctor']");
+        if (doctorSelect) {
+          doctorSelect.innerHTML = '<option value="">-- Choose Doctor (Optional) --</option>';
+          (data.doctors || []).forEach(d => {
+              let name = d.practitioner_name || d.name;
+              if (name.startsWith("Dr. ")) name = name.replace("Dr. ", "");
+              while (/^(dr\.?\s*)+/i.test(name)) {
+                  name = name.replace(/^(dr\.?\s*)+/i, "");
+              }
+              if (name.length > 0) {
+                  name = name.charAt(0).toUpperCase() + name.slice(1);
+              }
+              const dept = d.department || d.specialization || "General Medicine";
+              doctorSelect.innerHTML += `<option value="${d.name}" data-fee="${d.op_consulting_charge || 0}">Dr. ${name} - ${dept}</option>`;
+          });
+          doctorSelect.onchange = handleDoctorChange;
+        }
 
         const mRes = await fetch('/api/method/hospital_management.api.get_medicines_list');
         const mData = await mRes.json();
@@ -1549,8 +2102,130 @@ Please enter reason for cancellation:`, 'Patient cancelled appointment');
 
       document.getElementById('customItemsContainer').innerHTML = '';
       customItemIndex = 0;
+      const oldNotice = document.getElementById('ipdStayNotice');
+      if (oldNotice) oldNotice.remove();
       addCustomItemRow('Consultation', 'Doctor Consultation Charge', 1, 500);
       openModal('customInvoiceModal');
+    }
+
+    async function handlePatientChange() {
+      const patientSelect = document.getElementById("patient_select") || document.querySelector("select[name='patient']");
+      if (!patientSelect || !patientSelect.value) {
+        const oldNotice = document.getElementById('ipdStayNotice');
+        if (oldNotice) oldNotice.remove();
+        return;
+      }
+
+      const patientId = patientSelect.value;
+      try {
+        const res = await fetch(`/api/method/hospital_management.api.get_patient_ipd_billing_details?patient_id=${encodeURIComponent(patientId)}`);
+        const json = await res.json();
+        const details = json.message || {};
+
+        const oldNotice = document.getElementById('ipdStayNotice');
+        if (oldNotice) oldNotice.remove();
+
+        if (details.has_ipd_stay) {
+          const banner = document.createElement('div');
+          banner.id = 'ipdStayNotice';
+          banner.className = 'ipd-stay-notice';
+          banner.style = 'margin:12px 0; padding:12px 16px; background:linear-gradient(135deg, rgba(56,189,248,0.12), rgba(99,102,241,0.08)); border:1px solid rgba(56,189,248,0.3); border-radius:10px; color:#e0f2fe; font-size:12px; display:flex; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 4px 14px rgba(0,0,0,0.25);';
+          
+          const statusText = details.status === 'Discharged' ? `<span style="background:rgba(244,63,94,0.18); color:#fb7185; padding:2px 7px; border-radius:4px; font-weight:700; font-size:10px;">Discharged (${details.discharge_date})</span>` : `<span style="background:rgba(52,211,153,0.18); color:#34d399; padding:2px 7px; border-radius:4px; font-weight:700; font-size:10px;">Admitted (${details.admission_date})</span>`;
+
+          banner.innerHTML = `
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="font-size:20px; line-height:1;">🏥</span>
+              <div>
+                <div style="font-weight:700; color:#38bdf8; font-size:13px; display:flex; align-items:center; gap:8px;">
+                  Inpatient (IPD) Stay &middot; ${escapeHtml(details.ward_type)} ${statusText}
+                </div>
+                <div style="color:var(--text-muted); font-size:11px; margin-top:2px;">
+                  Bed: <strong>${escapeHtml(details.room_number || 'IPD Bed')}</strong> &middot; Stay Period: ${details.admission_date} &rarr; ${details.discharge_date} (<strong>${details.days} Days</strong> @ ₹${parseFloat(details.room_rate || 0).toLocaleString('en-IN')}/day)
+                </div>
+              </div>
+            </div>
+            <div style="text-align:right; flex-shrink:0;">
+              <div style="font-size:14px; font-weight:800; color:#34d399;">₹${parseFloat(details.room_charges || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
+              <span style="display:inline-block; margin-top:2px; font-size:10px; font-weight:700; color:#38bdf8; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.25); padding:1px 6px; border-radius:4px;">Auto-Added to Bill</span>
+            </div>
+          `;
+
+          const container = document.getElementById('customItemsContainer');
+          if (container && container.parentNode) {
+            container.parentNode.insertBefore(banner, container);
+          }
+
+          // Check if room charge row already exists
+          const rows = container.querySelectorAll('.custom-item-row');
+          let roomRowFound = false;
+          rows.forEach(r => {
+            const id = r.id.split('_')[1];
+            const nameEl = document.getElementById(`itemName_${id}`);
+            if (nameEl && nameEl.value.toLowerCase().includes('room charges')) {
+              roomRowFound = true;
+              const qtyEl = document.getElementById(`itemQty_${id}`);
+              const priceEl = document.getElementById(`itemPrice_${id}`);
+              if (qtyEl) qtyEl.value = details.days;
+              if (priceEl) priceEl.value = details.room_rate;
+            }
+          });
+
+          if (!roomRowFound) {
+            addCustomItemRow(
+              'Room Charges',
+              `Room Charges - ${details.ward_type} (${details.room_number || 'IPD Stay'}) [${details.days} Days @ ₹${details.room_rate}/day]`,
+              details.days,
+              details.room_rate
+            );
+          }
+
+          // Suggest doctor if available and not chosen
+          const doctorSelect = document.getElementById("doctor_select") || document.querySelector("select[name='doctor']");
+          if (doctorSelect && !doctorSelect.value && details.suggested_doctor) {
+            for (let i = 0; i < doctorSelect.options.length; i++) {
+              if (doctorSelect.options[i].value === details.suggested_doctor) {
+                doctorSelect.selectedIndex = i;
+                handleDoctorChange();
+                break;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching IPD stay details:', err);
+      }
+    }
+
+    function handleDoctorChange() {
+      const doctorSelect = document.getElementById("doctor_select") || document.querySelector("select[name='doctor']");
+      if (!doctorSelect) return;
+      const opt = doctorSelect.options[doctorSelect.selectedIndex];
+      if (!opt) return;
+
+      const fee = parseFloat(opt.getAttribute('data-fee'));
+      if (isNaN(fee) || fee <= 0) return;
+
+      const container = document.getElementById('customItemsContainer');
+      if (!container) return;
+
+      const rows = container.querySelectorAll('.custom-item-row');
+      let consultationFound = false;
+      rows.forEach(r => {
+        const id = r.id.split('_')[1];
+        const typeEl = document.getElementById(`itemType_${id}`);
+        if (typeEl && typeEl.value === 'Consultation') {
+          const priceEl = document.getElementById(`itemPrice_${id}`);
+          if (priceEl) {
+            priceEl.value = fee;
+            consultationFound = true;
+          }
+        }
+      });
+
+      if (!consultationFound && rows.length === 0) {
+        addCustomItemRow('Consultation', 'Doctor Consultation Charge', 1, fee);
+      }
     }
 
     function addCustomItemRow(type='Service', name='', qty=1, price=0) {
@@ -1563,6 +2238,7 @@ Please enter reason for cancellation:`, 'Patient cancelled appointment');
       row.innerHTML = `
         <select class="form-control" style="padding:8px;" id="itemType_${id}" onchange="handleItemTypeChange(${id})">
           <option value="Consultation" ${type==='Consultation'?'selected':''}>Consultation</option>
+          <option value="Room Charges" ${type==='Room Charges'?'selected':''}>Room Charges</option>
           <option value="Medicine" ${type==='Medicine'?'selected':''}>Medicine</option>
           <option value="Procedure" ${type==='Procedure'?'selected':''}>Procedure</option>
           <option value="Service" ${type==='Service'?'selected':''}>Service</option>
@@ -1586,8 +2262,18 @@ Please enter reason for cancellation:`, 'Patient cancelled appointment');
       const nameInput = document.getElementById(`itemName_${id}`);
       const priceInput = document.getElementById(`itemPrice_${id}`);
       if (t === 'Consultation') {
-        nameInput.value = 'General Consultation Fee';
-        priceInput.value = 500;
+        nameInput.value = 'Doctor Consultation Charge';
+        const doctorSelect = document.getElementById("doctor_select") || document.querySelector("select[name='doctor']");
+        let fee = 500;
+        if (doctorSelect && doctorSelect.selectedIndex > 0) {
+          const opt = doctorSelect.options[doctorSelect.selectedIndex];
+          const docFee = parseFloat(opt.getAttribute('data-fee'));
+          if (!isNaN(docFee) && docFee > 0) fee = docFee;
+        }
+        priceInput.value = fee;
+      } else if (t === 'Room Charges') {
+        nameInput.value = 'Hospital Inpatient Room Charges (General Ward)';
+        priceInput.value = 1000;
       } else if (t === 'Medicine' && availableMedicines.length > 0) {
         nameInput.value = availableMedicines[0].medicine_name || availableMedicines[0].name;
         priceInput.value = availableMedicines[0].price || 20;
@@ -1600,8 +2286,10 @@ Please enter reason for cancellation:`, 'Patient cancelled appointment');
       btn.disabled = true;
       btn.textContent = 'Generating…';
 
-      const patient = document.getElementById('custPatientSelect').value;
-      const doctor = document.getElementById('custDoctorSelect').value;
+      const patientSelect = document.getElementById("patient_select") || document.querySelector("select[name='patient']");
+      const doctorSelect = document.getElementById("doctor_select") || document.querySelector("select[name='doctor']");
+      const patient = patientSelect ? patientSelect.value : "";
+      const doctor = doctorSelect ? doctorSelect.value : "";
       const discount = parseFloat(document.getElementById('custDiscountInput').value) || 0;
       const tax = parseFloat(document.getElementById('custTaxInput').value) || 0;
       const remarks = document.getElementById('custRemarksInput').value.trim();
@@ -1618,7 +2306,7 @@ Please enter reason for cancellation:`, 'Patient cancelled appointment');
       });
 
       if (items.length === 0) {
-        alert('Please add at least one line item.');
+        showCarePlusToast('Please add at least one line item.', 'warning');
         btn.disabled = false;
         btn.textContent = 'Generate Invoice';
         return;
@@ -1639,17 +2327,19 @@ Please enter reason for cancellation:`, 'Patient cancelled appointment');
         });
 
         const data = await res.json();
-        if (data.message && data.message.status === 'success') {
+        const msg = data.message || data;
+        if (msg && (msg.status === 'success' || msg.invoice_id)) {
+          const invId = msg.invoice_id || (msg.invoice && msg.invoice.name);
           closeModal('customInvoiceModal');
-          loadInvoices();
-          alert(`✅ Invoice ${data.message.invoice_id} created successfully!`);
-          viewInvoiceSlip(data.message.invoice_id);
+          await loadInvoices();
+          showCarePlusToast(`Invoice ${invId || ''} created successfully!`, 'success', 'Invoice Generated');
+          if (invId) viewInvoiceSlip(invId);
         } else {
-          alert('Creation Failed: ' + ((data.message && data.message.message) || 'Error'));
+          showCarePlusToast('Creation Failed: ' + ((data.message && data.message.message) || 'Error'), 'error');
         }
       } catch (err) {
         console.error(err);
-        alert('Network error while creating invoice.');
+        showCarePlusToast('Network error while creating invoice.', 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = 'Generate Invoice';
@@ -1679,16 +2369,48 @@ Please enter reason for cancellation:`, 'Patient cancelled appointment');
     }
 
     async function confirmAndLogout() {
-      if (confirm('Are you sure you want to sign out?')) {
-        try {
-          await fetch('/api/method/hospital_management.api.logout', { method: 'POST' });
-        } catch (e) {}
-        window.location.replace('/frontend');
+      const confirmed = await showCarePlusConfirm({
+        title: "Confirm Sign Out",
+        message: "Are you sure you want to end your active billing session?",
+        subtext: "Any unsaved receipt modifications or invoice items will be closed.",
+        icon: "⏻",
+        confirmText: "Sign Out",
+        cancelText: "Cancel",
+        type: "danger"
+      });
+      if (!confirmed) return;
+
+      showCarePlusToast("Logged out successfully. Redirecting...", "success", "Signed Out");
+      try {
+        await fetch('/api/method/hospital_management.api.logout', { method: 'POST' });
+      } catch (e) {
+        console.error('Logout error:', e);
       }
+      window.history.replaceState(null, document.title, '/frontend');
+      setTimeout(() => window.location.replace('/frontend'), 700);
     }
 
     // Auto load on init
     loadInvoices();
   </script>
+
+<!-- CAREPLUS REUSABLE NOTIFICATION / CONFIRMATION MODAL -->
+<div class="careplus-modal-backdrop" id="careplusConfirmModalBackdrop" style="display:none;" onclick="handleCareplusModalBackdrop(event)">
+  <div class="careplus-modal-card" id="careplusConfirmModalCard" role="dialog" aria-modal="true">
+    <div class="careplus-modal-glow"></div>
+    <div class="careplus-modal-header-icon" id="careplusModalIcon">🔔</div>
+    <h3 class="careplus-modal-title" id="careplusModalTitle">Confirmation</h3>
+    <p class="careplus-modal-desc" id="careplusModalDesc">Are you sure you want to proceed?</p>
+    <p class="careplus-modal-subtext" id="careplusModalSubtext"></p>
+    <div class="careplus-modal-actions">
+      <button type="button" class="careplus-btn-cancel" id="careplusModalCancelBtn" onclick="resolveCareplusConfirm(false)">Cancel</button>
+      <button type="button" class="careplus-btn-confirm" id="careplusModalConfirmBtn" onclick="resolveCareplusConfirm(true)">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- CAREPLUS TOP-RIGHT FLOATING TOAST CONTAINER -->
+<div id="careplusToastContainer" class="careplus-toast-container" role="status" aria-live="polite"></div>
+
 </body>
 </html>

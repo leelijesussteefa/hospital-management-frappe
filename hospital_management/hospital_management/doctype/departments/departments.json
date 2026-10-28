@@ -11,7 +11,8 @@
   "department_name",
   "department_head",
   "description",
-  "s_active"
+  "s_active",
+  "is_active"
  ],
  "fields": [
   {
@@ -39,12 +40,18 @@
    "fieldname": "s_active",
    "fieldtype": "Check",
    "label": "s Active"
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active",
+   "default": "1"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-13 15:36:10.745343",
+ "modified": "2026-10-23 11:15:00.000000",
  "modified_by": "Administrator",
  "module": "Hospital Management",
  "name": "Departments",
@@ -52,16 +59,34 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
    "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "Hospital Administrator",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "Doctor",
+   "read": 1
+  },
+  {
+   "role": "Nurse",
+   "read": 1
+  },
+  {
+   "role": "Patient",
+   "read": 1
+  },
+  {
+   "role": "Pharmacy Staff",
+   "read": 1
   }
  ],
  "row_format": "Dynamic",

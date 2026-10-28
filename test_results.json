@@ -1,0 +1,323 @@
+{
+  "timestamp": "2026-10-27T10:33:08.075079",
+  "total": 35,
+  "passed": 34,
+  "failed": 1,
+  "tests": [
+    {
+      "id": 1,
+      "category": "Authentication and Permissions",
+      "name": "Administrator can access authorized administrative functions",
+      "status": "PASS",
+      "expected": "Admin authenticated and accessed settings",
+      "actual": "is_admin=True, hospital=CarePlus Multispeciality Hospital",
+      "diagnostics": ""
+    },
+    {
+      "id": 2,
+      "category": "Authentication and Permissions",
+      "name": "Doctor can access assigned appointments",
+      "status": "PASS",
+      "expected": "Doctor resolved and dashboard retrieved",
+      "actual": "Doctor: Dr. Sarah Miller",
+      "diagnostics": ""
+    },
+    {
+      "id": 3,
+      "category": "Authentication and Permissions",
+      "name": "Nurse can access assigned patients",
+      "status": "PASS",
+      "expected": "Nurse profile resolved and role verified",
+      "actual": "Nurse: Nurse Emily Watson, is_nurse=True",
+      "diagnostics": ""
+    },
+    {
+      "id": 4,
+      "category": "Authentication and Permissions",
+      "name": "Patient can access their own portal",
+      "status": "PASS",
+      "expected": "Patient Arthur Pendelton accessed personal portal",
+      "actual": "Loaded data for patient Arthur Pendelton",
+      "diagnostics": ""
+    },
+    {
+      "id": 5,
+      "category": "Authentication and Permissions",
+      "name": "Pharmacy Staff can access authorized pharmacy functions",
+      "status": "PASS",
+      "expected": "Pharmacy staff authorized and queried stock",
+      "actual": "Stock: 186.0 units",
+      "diagnostics": ""
+    },
+    {
+      "id": 6,
+      "category": "Authentication and Permissions",
+      "name": "Unauthenticated visitors cannot access private records",
+      "status": "PASS",
+      "expected": "Guest access blocked with PermissionError",
+      "actual": "PermissionError raised as expected",
+      "diagnostics": ""
+    },
+    {
+      "id": 7,
+      "category": "Authentication and Permissions",
+      "name": "Users cannot bypass permissions by changing URLs or document IDs",
+      "status": "PASS",
+      "expected": "Role spoofing blocked with PermissionError",
+      "actual": "PermissionError raised correctly",
+      "diagnostics": ""
+    },
+    {
+      "id": 8,
+      "category": "Authentication and Permissions",
+      "name": "Unauthorized API requests are rejected",
+      "status": "PASS",
+      "expected": "Unauthorized API request rejected",
+      "actual": "PermissionError enforced",
+      "diagnostics": ""
+    },
+    {
+      "id": 9,
+      "category": "Authentication and Permissions",
+      "name": "Server-side permissions are enforced",
+      "status": "PASS",
+      "expected": "Server-side role permission enforced",
+      "actual": "Blocked unauthorized nurse consultation action",
+      "diagnostics": ""
+    },
+    {
+      "id": 10,
+      "category": "Clinical Workflows",
+      "name": "Patient registration works",
+      "status": "PASS",
+      "expected": "Patient Clara Oswald registered",
+      "actual": "Patient ID: Clara Oswald",
+      "diagnostics": ""
+    },
+    {
+      "id": 11,
+      "category": "Clinical Workflows",
+      "name": "Consultation creation works",
+      "status": "PASS",
+      "expected": "Consultation created and finalized",
+      "actual": "Record ID: MR-00039",
+      "diagnostics": ""
+    },
+    {
+      "id": 12,
+      "category": "Clinical Workflows",
+      "name": "Authorized prescription creation works",
+      "status": "PASS",
+      "expected": "E-Prescription authorized with child items",
+      "actual": "Prescription ID: PRE-00208",
+      "diagnostics": ""
+    },
+    {
+      "id": 13,
+      "category": "Clinical Workflows",
+      "name": "Nurse vital-sign recording works",
+      "status": "PASS",
+      "expected": "Vitals logged with BMI 24.5 and Hypertension Alert",
+      "actual": "ID: VIT-00068, Alert: Routine morning nursing check [CLINICAL ALERTS: Hypertension Warning (BP: 145/95 mmHg)]",
+      "diagnostics": ""
+    },
+    {
+      "id": 14,
+      "category": "Clinical Workflows",
+      "name": "Nurses cannot alter finalized doctor prescriptions",
+      "status": "PASS",
+      "expected": "Nurses blocked from altering finalized doctor diagnosis",
+      "actual": "PermissionError enforced",
+      "diagnostics": ""
+    },
+    {
+      "id": 15,
+      "category": "Clinical Workflows",
+      "name": "Clinical audit information is maintained",
+      "status": "PASS",
+      "expected": "Clinical audit trail verified",
+      "actual": "Record VIT-00068 created by nurse@careplus.hospital at 2026-10-27 16:01:54.331161",
+      "diagnostics": ""
+    },
+    {
+      "id": 16,
+      "category": "Patient Isolation",
+      "name": "Patient A cannot access Patient B's appointments",
+      "status": "FAIL",
+      "expected": "",
+      "actual": "Exception: Invalid Outgoing Mail Server or Port: [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1082)",
+      "diagnostics": "Traceback (most recent call last):\n  File \"/home/leeli/frappe-bench-v16/apps/frappe/frappe/email/smtp.py\", line 83, in session\n    self.secure_session(_session)\n    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^\n  File \"/home/leeli/frappe-bench-v16/apps/frappe/frappe/email/smtp.py\", line 62, in secure_session\n    conn.starttls()\n    ~~~~~~~~~~~~~^^\n  File \"/usr/lib/python3.14/smtplib.py\", line 791, in starttls\n    self.sock = context.wrap_socket(self.sock,\n                ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^\n                                    server_hostname=self._host)\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.14/ssl.py\", line 455, in wrap_socket\n    return self.sslsocket_class._create(\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^\n        sock=sock,\n        ^^^^^^^^^^\n    ...<5 lines>...\n        session=session\n        ^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/usr/lib/python3.14/ssl.py\", line 1076, in _create\n    self.do_handshake()\n    ~~~~~~~~~~~~~~~~~^^\n  File \"/usr/lib/python3.14/ssl.py\", line 1372, in do_handshake\n    self._sslobj.do_handshake()\n    ~~~~~~~~~~~~~~~~~~~~~~~~~^^\nssl.SSLEOFError: [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1082)\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/home/leeli/frappe-bench-v16/apps/hospital_management/run_production_tests.py\", line 42, in run_test\n    expected, actual = test_func()\n                       ~~~~~~~~~^^\n  File \"/home/leeli/frappe-bench-v16/apps/hospital_management/run_production_tests.py\", line 288, in test_16\n    frappe.db.commit()\n    ~~~~~~~~~~~~~~~~^^\n  File \"/home/leeli/frappe-bench-v16/apps/frappe/frappe/database/database.py\", line 1194, in commit\n    self.after_commit.run()\n    ~~~~~~~~~~~~~~~~~~~~~^^\n  File \"/home/leeli/frappe-bench-v16/apps/frappe/frappe/utils/__init__.py\", line 1139, in run\n    _func()\n    ~~~~~^^\n  File \"/home/leeli/frappe-bench-v16/apps/frappe/frappe/email/doctype/email_queue/email_queue.py\", line 255, in send\n    msg_bytes = validate_and_prepare_message(message)\n  File \"/home/leeli/frappe-bench-v16/apps/frappe/frappe/email/doctype/email_queue/email_queue.py\", line 203, in validate_and_prepare_message\n    if ctx.smtp_server.session.has_extn(\"SIZE\"):\n       ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/leeli/frappe-bench-v16/apps/frappe/frappe/email/smtp.py\", line 108, in session\n    frappe.throw(\n    ~~~~~~~~~~~~^\n    \t_(\"Invalid Outgoing Mail Server or Port: {0}\").format(str(e)),\n     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    \ttitle=_(\"Incorrect Configuration\"),\n     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/home/leeli/frappe-bench-v16/apps/frappe/frappe/utils/messages.py\", line 159, in throw\n    msgprint(\n    ~~~~~~~~^\n    \tmsg,\n     ^^^^\n    ...<7 lines>...\n    \tallow_dangerous_html=allow_dangerous_html,\n     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/home/leeli/frappe-bench-v16/apps/frappe/frappe/utils/messages.py\", line 118, in msgprint\n    _raise_exception()\n    ~~~~~~~~~~~~~~~~^^\n  File \"/home/leeli/frappe-bench-v16/apps/frappe/frappe/utils/messages.py\", line 59, in _raise_exception\n    raise exc\nfrappe.exceptions.ValidationError: Invalid Outgoing Mail Server or Port: [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1082)\n"
+    },
+    {
+      "id": 17,
+      "category": "Patient Isolation",
+      "name": "Patient A cannot access Patient B's prescriptions",
+      "status": "PASS",
+      "expected": "Patient A prescriptions strictly isolated",
+      "actual": "Patient Beta prescription PRE-00209 excluded",
+      "diagnostics": ""
+    },
+    {
+      "id": 18,
+      "category": "Patient Isolation",
+      "name": "Patient A cannot access Patient B's reports",
+      "status": "PASS",
+      "expected": "Patient A vitals strictly isolated",
+      "actual": "Patient Beta vitals VIT-00069 excluded",
+      "diagnostics": ""
+    },
+    {
+      "id": 19,
+      "category": "Patient Isolation",
+      "name": "Patient A cannot access Patient B's invoices",
+      "status": "PASS",
+      "expected": "Patient A querying Patient B invoices rejected with PermissionError",
+      "actual": "PermissionError enforced",
+      "diagnostics": ""
+    },
+    {
+      "id": 20,
+      "category": "Patient Isolation",
+      "name": "Doctor A cannot access unauthorized patients/doctor actions",
+      "status": "PASS",
+      "expected": "Doctor cross-access rejected with PermissionError",
+      "actual": "PermissionError enforced",
+      "diagnostics": ""
+    },
+    {
+      "id": 21,
+      "category": "Patient Isolation",
+      "name": "Nurse A cannot access unauthorized doctor actions",
+      "status": "PASS",
+      "expected": "Nurse restricted from doctor actions",
+      "actual": "PermissionError enforced",
+      "diagnostics": ""
+    },
+    {
+      "id": 22,
+      "category": "Scheduling and Pharmacy",
+      "name": "Conflicting appointments are rejected",
+      "status": "PASS",
+      "expected": "Overlapping appointment booking rejected",
+      "actual": "First Appt: qjckd044uv, Second rejected",
+      "diagnostics": ""
+    },
+    {
+      "id": 23,
+      "category": "Scheduling and Pharmacy",
+      "name": "Invalid time ranges are rejected",
+      "status": "PASS",
+      "expected": "Booking during scheduled break rejected",
+      "actual": "Break-time validation triggered",
+      "diagnostics": ""
+    },
+    {
+      "id": 24,
+      "category": "Scheduling and Pharmacy",
+      "name": "Authorized dispensing works",
+      "status": "PASS",
+      "expected": "Prescription dispensed via ERPNext Stock Entry",
+      "actual": "Prescription PRE-00210 -> Stock Entry MAT-STE-2026-00076",
+      "diagnostics": ""
+    },
+    {
+      "id": 25,
+      "category": "Scheduling and Pharmacy",
+      "name": "Cancelled prescriptions cannot be dispensed",
+      "status": "PASS",
+      "expected": "Dispensing cancelled prescription rejected",
+      "actual": "Cannot dispense cancelled prescription PRE-00211.",
+      "diagnostics": ""
+    },
+    {
+      "id": 26,
+      "category": "Scheduling and Pharmacy",
+      "name": "Duplicate dispensing is prevented",
+      "status": "PASS",
+      "expected": "Duplicate dispensing prevented",
+      "actual": "Prescription PRE-00212 has already been dispensed.",
+      "diagnostics": ""
+    },
+    {
+      "id": 27,
+      "category": "Scheduling and Pharmacy",
+      "name": "Dispensed quantities respect authorization limits",
+      "status": "PASS",
+      "expected": "Over-dispensing beyond stock rejected",
+      "actual": "Insufficient stock for 'Paracetamol 500mg'. Available: 184.0, Required: 999999.0",
+      "diagnostics": ""
+    },
+    {
+      "id": 28,
+      "category": "Scheduling and Pharmacy",
+      "name": "Inventory transactions update stock correctly",
+      "status": "PASS",
+      "expected": "ERPNext Stock Entry deducted exactly 5 units",
+      "actual": "Initial: 184.0, New: 179.0",
+      "diagnostics": ""
+    },
+    {
+      "id": 29,
+      "category": "Scheduling and Pharmacy",
+      "name": "Billing and inventory remain consistent",
+      "status": "PASS",
+      "expected": "Billing math consistent with quantity and price",
+      "actual": "Total: 10.0, Outstanding: 10.0",
+      "diagnostics": ""
+    },
+    {
+      "id": 30,
+      "category": "Configuration and Quality",
+      "name": "Changing an approved configuration setting updates the relevant behavior",
+      "status": "PASS",
+      "expected": "Hospital Settings slot duration updated and verified dynamically",
+      "actual": "Updated to 45, restored to 30",
+      "diagnostics": ""
+    },
+    {
+      "id": 31,
+      "category": "Configuration and Quality",
+      "name": "No production workflows depend on development-only mock data",
+      "status": "PASS",
+      "expected": "Zero mock records found in production database",
+      "actual": "No mock or fake records in Patient table",
+      "diagnostics": ""
+    },
+    {
+      "id": 32,
+      "category": "Configuration and Quality",
+      "name": "The application does not contain unintended hardcoded business records",
+      "status": "PASS",
+      "expected": "DocTypes use dynamic naming series rules",
+      "actual": "Autoname rule: naming_series:perscription",
+      "diagnostics": ""
+    },
+    {
+      "id": 33,
+      "category": "Configuration and Quality",
+      "name": "Migrations preserve existing application data",
+      "status": "PASS",
+      "expected": "Database migration preserved all existing records",
+      "actual": "Patients: 20, Doctors: 26",
+      "diagnostics": ""
+    },
+    {
+      "id": 34,
+      "category": "Configuration and Quality",
+      "name": "Required validation works at the server level",
+      "status": "PASS",
+      "expected": "Server-side mandatory validation enforced",
+      "actual": "MandatoryError triggered on missing required field",
+      "diagnostics": ""
+    },
+    {
+      "id": 35,
+      "category": "Configuration and Quality",
+      "name": "Error handling does not expose secrets or private patient information",
+      "status": "PASS",
+      "expected": "Error response is safe and does not leak secrets or stack traces",
+      "actual": "Clean generic error message returned",
+      "diagnostics": ""
+    }
+  ]
+}

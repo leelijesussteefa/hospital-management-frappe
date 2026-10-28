@@ -1,0 +1,186 @@
+{
+ "actions": [],
+ "creation": "2026-10-23 11:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "general_section",
+  "hospital_name",
+  "contact_phone",
+  "contact_email",
+  "address",
+  "timezone",
+  "column_break_general",
+  "default_company",
+  "default_warehouse",
+  "default_currency",
+  "scheduling_section",
+  "default_slot_duration",
+  "max_advance_booking_days",
+  "column_break_sched",
+  "enable_reminders",
+  "pharmacy_section",
+  "low_stock_threshold",
+  "near_expiry_days",
+  "column_break_pharm",
+  "auto_generate_invoice"
+ ],
+ "fields": [
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "Hospital Information & Regional Defaults"
+  },
+  {
+   "default": "CarePlus Multispeciality Hospital",
+   "fieldname": "hospital_name",
+   "fieldtype": "Data",
+   "label": "Hospital Name",
+   "reqd": 1
+  },
+  {
+   "default": "+91 98765 43210",
+   "fieldname": "contact_phone",
+   "fieldtype": "Phone",
+   "label": "Contact Phone"
+  },
+  {
+   "default": "info@careplus.hospital",
+   "fieldname": "contact_email",
+   "fieldtype": "Data",
+   "label": "Contact Email"
+  },
+  {
+   "default": "123 Healthcare Boulevard, Medical District",
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Hospital Address"
+  },
+  {
+   "default": "Asia/Kolkata",
+   "fieldname": "timezone",
+   "fieldtype": "Data",
+   "label": "Default Timezone"
+  },
+  {
+   "fieldname": "column_break_general",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Bosco Soft",
+   "fieldname": "default_company",
+   "fieldtype": "Link",
+   "label": "Default Company",
+   "options": "Company"
+  },
+  {
+   "default": "Stores - BS",
+   "fieldname": "default_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Pharmacy Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "default": "INR",
+   "fieldname": "default_currency",
+   "fieldtype": "Data",
+   "label": "Default Currency"
+  },
+  {
+   "fieldname": "scheduling_section",
+   "fieldtype": "Section Break",
+   "label": "Appointment & Scheduling Configuration"
+  },
+  {
+   "default": "30",
+   "fieldname": "default_slot_duration",
+   "fieldtype": "Int",
+   "label": "Default Appointment Slot Duration (Mins)"
+  },
+  {
+   "default": "30",
+   "fieldname": "max_advance_booking_days",
+   "fieldtype": "Int",
+   "label": "Max Advance Booking Window (Days)"
+  },
+  {
+   "fieldname": "column_break_sched",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_reminders",
+   "fieldtype": "Check",
+   "label": "Enable Automated Appointment Reminders"
+  },
+  {
+   "fieldname": "pharmacy_section",
+   "fieldtype": "Section Break",
+   "label": "Pharmacy & Inventory Automation"
+  },
+  {
+   "default": "50",
+   "fieldname": "low_stock_threshold",
+   "fieldtype": "Int",
+   "label": "Low Stock Warning Threshold (Units)"
+  },
+  {
+   "default": "60",
+   "fieldname": "near_expiry_days",
+   "fieldtype": "Int",
+   "label": "Near Expiry Warning Window (Days)"
+  },
+  {
+   "fieldname": "column_break_pharm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "auto_generate_invoice",
+   "fieldtype": "Check",
+   "label": "Auto-Generate Invoice on Prescription Dispense"
+  }
+ ],
+ "issingle": 1,
+ "modified": "2026-10-23 11:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hospital Management",
+ "name": "Hospital Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Hospital Administrator",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Doctor"
+  },
+  {
+   "read": 1,
+   "role": "Nurse"
+  },
+  {
+   "read": 1,
+   "role": "Pharmacy Staff"
+  }
+ ]
+}

@@ -4,6 +4,90 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CarePlus | Doctor Portal</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <script>
+    (function initSessionGuard() {
+        // 1. Immediate server-rendered session validation
+        const sessionUser = "{{ frappe.session.user }}";
+        if (!sessionUser || sessionUser === "Guest") {
+            window.history.replaceState(null, document.title, '/frontend');
+            window.location.replace('/frontend');
+            return;
+        }
+
+        // Replace current state so back navigation cannot freely reopen authenticated dashboard pages without valid credentials
+        window.history.replaceState(null, document.title, window.location.href);
+
+        // 2. Client-side session verification against backend API
+        async function checkAuthSession() {
+            try {
+                const res = await fetch('/api/method/hospital_management.api.check_session', {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    },
+                    cache: 'no-store'
+                });
+                if (!res.ok) {
+                    window.history.replaceState(null, document.title, '/frontend');
+                    window.location.replace('/frontend');
+                    return;
+                }
+                const data = await res.json();
+                const info = (data && data.message) ? data.message : data;
+                if (!info || info.status === 'unauthenticated' || !info.user || info.user === 'Guest') {
+                    window.history.replaceState(null, document.title, '/frontend');
+                    window.location.replace('/frontend');
+                }
+            } catch (err) {
+                console.warn('Session verification error:', err);
+            }
+        }
+        window.checkAuthSession = checkAuthSession;
+
+        // 3. Initial page load validation
+        checkAuthSession();
+
+        // 4. Prevent Browser Back-Forward Cache (bfcache)
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                // If restored from back-forward cache, verify active session
+                checkAuthSession();
+            }
+        });
+
+        // 5. Enforce history lock and validate on popstate (back navigation)
+        function lockNavigation() {
+            window.history.pushState(null, document.title, window.location.href);
+        }
+        lockNavigation();
+
+        window.addEventListener('popstate', function (event) {
+            checkAuthSession();
+            lockNavigation();
+        });
+
+        // 6. Trap Backspace on non-input elements
+        window.addEventListener('keydown', function (e) {
+            if (e.key === 'Backspace' || e.keyCode === 8) {
+                const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+                const isEditable = document.activeElement && (
+                    document.activeElement.isContentEditable ||
+                    tag === 'input' ||
+                    tag === 'textarea' ||
+                    tag === 'select'
+                );
+                if (!isEditable) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }
+        }, true);
+    })();
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
@@ -577,6 +661,988 @@
       .topbar { padding: 16px; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
     }
+  
+    /* Patient Timeline Link Styling */
+    .patient-timeline-trigger {
+      color: var(--blue, #38bdf8);
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-color: rgba(56, 189, 248, 0.4);
+      text-underline-offset: 3px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .patient-timeline-trigger:hover {
+      color: #7dd3fc;
+      text-decoration-color: #38bdf8;
+      transform: translateY(-1px);
+    }
+
+    /* ==========================================================================
+       PATIENT CLINICAL TIMELINE SLIDE-OVER DRAWER
+       ========================================================================== */
+    .timeline-drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 9, 20, 0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 1200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .timeline-drawer-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .timeline-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 640px;
+      max-width: 95vw;
+      height: 100vh;
+      background: #0d1322;
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: -15px 0 45px rgba(0, 0, 0, 0.65);
+      display: flex;
+      flex-direction: column;
+      z-index: 1201;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+    .timeline-drawer.active {
+      transform: translateX(0);
+    }
+
+    /* Drawer Header */
+    .timeline-drawer-header {
+      padding: 24px;
+      background: linear-gradient(180deg, #131c31 0%, #0d1322 100%);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      position: relative;
+    }
+    .timeline-header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .timeline-patient-profile {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .timeline-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--indigo), var(--blue));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+      flex-shrink: 0;
+    }
+    .timeline-patient-name {
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .timeline-patient-sub {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .timeline-sub-badge {
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-dim);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .timeline-close-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-dim);
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+    .timeline-close-btn:hover {
+      background: rgba(248, 113, 113, 0.2);
+      color: var(--red);
+      border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    /* Quick Metrics Row */
+    .timeline-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .timeline-metric-chip {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 8px 12px;
+      text-align: center;
+    }
+    .timeline-metric-val {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .timeline-metric-lbl {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Filter Pills */
+    .timeline-filter-bar {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .timeline-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-dim);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    .timeline-pill:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+    }
+    .timeline-pill.active {
+      background: linear-gradient(135deg, var(--indigo), var(--blue));
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+    }
+
+    /* Drawer Content Body */
+    .timeline-drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 24px 40px;
+      position: relative;
+    }
+
+    /* Timeline Vertical Track */
+    .timeline-stream {
+      position: relative;
+      padding-left: 44px;
+    }
+    .timeline-stream::before {
+      content: '';
+      position: absolute;
+      top: 14px;
+      bottom: 20px;
+      left: 17px;
+      width: 2px;
+      background: linear-gradient(180deg, #38bdf8 0%, #6366f1 50%, #ec4899 100%);
+      opacity: 0.4;
+      border-radius: 1px;
+    }
+
+    /* Timeline Event Item */
+    .timeline-event-item {
+      position: relative;
+      margin-bottom: 24px;
+    }
+    .timeline-event-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .timeline-node-icon {
+      position: absolute;
+      left: -44px;
+      top: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      background: #111827;
+      border: 2px solid var(--border);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      z-index: 2;
+      transition: transform 0.2s ease;
+    }
+    .timeline-event-item:hover .timeline-node-icon {
+      transform: scale(1.1);
+    }
+    .timeline-node-icon.node-appointment { border-color: #38bdf8; background: rgba(56, 189, 248, 0.15); }
+    .timeline-node-icon.node-prescription { border-color: #a78bfa; background: rgba(167, 139, 250, 0.15); }
+    .timeline-node-icon.node-medical_record { border-color: #34d399; background: rgba(52, 211, 153, 0.15); }
+    .timeline-node-icon.node-vitals { border-color: #fb7185; background: rgba(251, 113, 133, 0.15); }
+
+    /* Timeline Card */
+    .timeline-card {
+      background: rgba(26, 34, 54, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 16px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    }
+    .timeline-card:hover {
+      background: rgba(31, 42, 64, 0.85);
+      border-color: rgba(255, 255, 255, 0.15);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .timeline-card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .timeline-card-date {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .timeline-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .timeline-badge.blue { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .timeline-badge.purple { background: rgba(167, 139, 250, 0.15); color: #a78bfa; border: 1px solid rgba(167, 139, 250, 0.3); }
+    .timeline-badge.emerald { background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); }
+    .timeline-badge.rose { background: rgba(251, 113, 133, 0.15); color: #fb7185; border: 1px solid rgba(251, 113, 133, 0.3); }
+
+    .timeline-card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .timeline-card-sub {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    /* Key-value details inside event */
+    .timeline-details-grid {
+      background: rgba(10, 14, 26, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px 14px;
+    }
+    .timeline-detail-col {
+      display: flex;
+      flex-direction: column;
+    }
+    .timeline-detail-col.full-span {
+      grid-column: 1 / -1;
+    }
+    .timeline-detail-lbl {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+    .timeline-detail-val {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      margin-top: 2px;
+      word-break: break-word;
+    }
+
+    /* Empty & Loading states */
+    .timeline-empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-dim);
+    }
+    .timeline-empty-icon {
+      font-size: 48px;
+      margin-bottom: 14px;
+      opacity: 0.8;
+    }
+    .timeline-empty-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .timeline-empty-desc {
+      font-size: 13px;
+      max-width: 320px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+
+    .timeline-loading-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 20px;
+      color: var(--text-dim);
+    }
+    .timeline-spinner {
+      width: 44px;
+      height: 44px;
+      border: 3px solid rgba(99, 102, 241, 0.15);
+      border-top-color: var(--indigo);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+
+    /* Feature 8: E-Prescription & Pharmacy Desk Styles */
+    .rx-dynamic-table th, .rx-dynamic-table td {
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .rx-row-input {
+      background: var(--surface3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 6px 8px;
+      width: 100%;
+      font-size: 12px;
+    }
+    .rx-row-input:focus {
+      outline: none;
+      border-color: var(--indigo);
+    }
+    .pharmacy-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transition: border-color 0.2s;
+    }
+    .pharmacy-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+    .stock-tag {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .stock-tag.in {
+      background: rgba(74, 222, 128, 0.15);
+      color: #4ade80;
+      border: 1px solid rgba(74, 222, 128, 0.3);
+    }
+    .stock-tag.low {
+      background: rgba(251, 191, 36, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+    .stock-tag.out {
+      background: rgba(248, 113, 113, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(248, 113, 113, 0.3);
+    }
+
+    /* CAREPLUS DARK GLASSMORPHIC DOCTOR SEARCH */
+    .viewing-doctor-search-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .viewing-doctor-search-input {
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #f8fafc;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 12px 6px 28px;
+      border-radius: 8px;
+      width: 220px;
+      outline: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    .viewing-doctor-search-input::placeholder {
+      color: #64748b;
+      font-size: 11.5px;
+    }
+
+    .viewing-doctor-search-input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22), 0 0 16px rgba(56, 189, 248, 0.2);
+      background: rgba(15, 23, 42, 0.98);
+      width: 250px;
+    }
+
+    .viewing-doctor-search-icon {
+      position: absolute;
+      left: 9px;
+      color: #64748b;
+      font-size: 11px;
+      pointer-events: none;
+      transition: color 0.2s ease;
+    }
+
+    .viewing-doctor-search-input:focus + .viewing-doctor-search-icon,
+    .viewing-doctor-search-wrap:focus-within .viewing-doctor-search-icon {
+      color: #38bdf8;
+    }
+
+    .viewing-doctor-select {
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+      max-width: 240px;
+    }
+
+    .viewing-doctor-select:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+    }
+
+    .doctor-search-results-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      width: 320px;
+      max-height: 280px;
+      overflow-y: auto;
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98));
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 12px;
+      box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.85), 0 0 25px rgba(56, 189, 248, 0.18);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 1000;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      animation: docDropSlide 0.15s ease-out;
+    }
+
+    @keyframes docDropSlide {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .doc-search-item {
+      padding: 8px 10px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      border: 1px solid transparent;
+    }
+
+    .doc-search-item:hover, .doc-search-item.highlighted {
+      background: rgba(56, 189, 248, 0.14);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .doc-search-item.active-doctor {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.35);
+    }
+
+    .doc-search-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .doc-search-name {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .doc-search-meta {
+      font-size: 11px;
+      color: #94a3b8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .doc-search-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      white-space: nowrap;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-current-desk {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .doc-search-empty {
+      padding: 12px;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 12px;
+    }
+
+    /* CAREPLUS DOCTOR DUTY STATUS TOGGLE */
+    .duty-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 1px solid transparent;
+      outline: none;
+      user-select: none;
+      backdrop-filter: blur(10px);
+    }
+    .duty-toggle-btn:hover {
+      transform: translateY(-1px);
+    }
+    .duty-toggle-btn:active {
+      transform: scale(0.97);
+    }
+    .duty-toggle-btn.sidebar-duty-btn {
+      margin-top: 8px;
+      width: 100%;
+      justify-content: center;
+      padding: 5px 10px;
+    }
+    .duty-toggle-btn.header-duty-btn {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    .duty-toggle-track {
+      width: 28px;
+      height: 16px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      padding: 2px;
+      transition: background-color 0.25s ease;
+      position: relative;
+    }
+    .duty-toggle-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    /* Active / On Duty state */
+    .duty-toggle-btn.active {
+      background: rgba(16, 185, 129, 0.14);
+      border-color: rgba(16, 185, 129, 0.45);
+      color: #34d399;
+    }
+    .duty-toggle-btn.active:hover {
+      background: rgba(16, 185, 129, 0.22);
+      border-color: rgba(16, 185, 129, 0.65);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+    }
+    .duty-toggle-btn.active .duty-toggle-track {
+      background: rgba(16, 185, 129, 0.35);
+    }
+    .duty-toggle-btn.active .duty-toggle-thumb {
+      background: #10b981;
+      transform: translateX(12px);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+    }
+
+    /* Inactive / On Leave state */
+    .duty-toggle-btn.inactive {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+    .duty-toggle-btn.inactive:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.6);
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+    }
+    .duty-toggle-btn.inactive .duty-toggle-track {
+      background: rgba(239, 68, 68, 0.3);
+    }
+    .duty-toggle-btn.inactive .duty-toggle-thumb {
+      background: #ef4444;
+      transform: translateX(0px);
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
+    }
+
+    /* CAREPLUS FLOATING TOAST NOTIFICATIONS */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 12px 18px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(12px);
+      animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.3s ease;
+    }
+    .toast.success {
+      border-color: rgba(16, 185, 129, 0.5);
+      background: rgba(6, 78, 59, 0.92);
+      color: #a7f3d0;
+    }
+    .toast.warning, .toast.inactive {
+      border-color: rgba(239, 68, 68, 0.5);
+      background: rgba(127, 29, 29, 0.92);
+      color: #fecaca;
+    }
+    .toast.error {
+      border-color: rgba(239, 68, 68, 0.5);
+      background: rgba(127, 29, 29, 0.92);
+      color: #fecaca;
+    }
+    @keyframes toastSlideIn {
+      from { transform: translateY(16px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+
+    /* CAREPLUS REUSABLE NOTIFICATION / CONFIRMATION MODAL & TOAST SYSTEM */
+    .careplus-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 14, 26, 0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: cpFadeIn 0.25s ease-out;
+    }
+    @keyframes cpFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .careplus-modal-card {
+      position: relative;
+      background: linear-gradient(145deg, rgba(20, 27, 45, 0.95), rgba(13, 19, 33, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(99, 102, 241, 0.18);
+      border-radius: 20px;
+      width: min(440px, 94vw);
+      padding: 32px 28px 24px;
+      text-align: center;
+      overflow: hidden;
+      animation: cpScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes cpScaleUp {
+      from { transform: scale(0.92) translateY(12px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .careplus-modal-glow {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 220px;
+      height: 60px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .careplus-modal-header-icon {
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.25));
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+    }
+    .careplus-modal-header-icon.danger {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(225, 29, 72, 0.3));
+      border-color: rgba(244, 63, 94, 0.45);
+      box-shadow: 0 8px 24px rgba(244, 63, 94, 0.35);
+    }
+    .careplus-modal-header-icon.success {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.3));
+      border-color: rgba(16, 185, 129, 0.45);
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+    }
+    .careplus-modal-title {
+      font-size: 19px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin: 0 0 8px;
+      letter-spacing: -0.3px;
+    }
+    .careplus-modal-desc {
+      font-size: 14px;
+      color: #cbd5e1;
+      line-height: 1.55;
+      margin: 0 0 6px;
+    }
+    .careplus-modal-subtext {
+      font-size: 12.5px;
+      color: #94a3b8;
+      line-height: 1.45;
+      margin: 0 0 24px;
+    }
+    .careplus-modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .careplus-btn-cancel {
+      flex: 1;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 600;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .careplus-btn-cancel:hover {
+      background: rgba(51, 65, 85, 0.9);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .careplus-btn-confirm {
+      flex: 1;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+      transition: all 0.2s ease;
+    }
+    .careplus-btn-confirm:hover {
+      background: linear-gradient(135deg, #818cf8, #6366f1);
+      box-shadow: 0 6px 22px rgba(99, 102, 241, 0.6);
+      transform: translateY(-1px);
+    }
+    .careplus-btn-confirm.danger {
+      background: linear-gradient(135deg, #f43f5e, #e11d48);
+      box-shadow: 0 4px 16px rgba(244, 63, 94, 0.4);
+    }
+    .careplus-btn-confirm.danger:hover {
+      background: linear-gradient(135deg, #fb7185, #f43f5e);
+      box-shadow: 0 6px 22px rgba(244, 63, 94, 0.6);
+    }
+    .careplus-btn-confirm.success {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+    }
+    .careplus-btn-confirm.success:hover {
+      background: linear-gradient(135deg, #34d399, #10b981);
+      box-shadow: 0 6px 22px rgba(16, 185, 129, 0.6);
+    }
+
+    /* TOP-RIGHT FLOATING TOAST NOTIFICATIONS */
+    .careplus-toast-container {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 10001;
+      pointer-events: none;
+    }
+    .careplus-toast {
+      pointer-events: auto;
+      min-width: 300px;
+      max-width: 420px;
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(99, 102, 241, 0.15);
+      border-radius: 14px;
+      padding: 14px 18px;
+      color: #fff;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      animation: cpToastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.3s ease;
+    }
+    @keyframes cpToastSlideIn {
+      from { transform: translateX(40px) scale(0.95); opacity: 0; }
+      to { transform: translateX(0) scale(1); opacity: 1; }
+    }
+    .careplus-toast-icon {
+      font-size: 20px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .careplus-toast-body {
+      flex: 1;
+    }
+    .careplus-toast-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 2px;
+    }
+    .careplus-toast-msg {
+      font-size: 12.5px;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+    .careplus-toast.success {
+      border-color: rgba(16, 185, 129, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(16, 185, 129, 0.2);
+    }
+    .careplus-toast.success .careplus-toast-title { color: #34d399; }
+    .careplus-toast.warning {
+      border-color: rgba(245, 158, 11, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(245, 158, 11, 0.2);
+    }
+    .careplus-toast.warning .careplus-toast-title { color: #fbbf24; }
+    .careplus-toast.error {
+      border-color: rgba(244, 63, 94, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(244, 63, 94, 0.2);
+    }
+    .careplus-toast.error .careplus-toast-title { color: #fda4af; }
+
+    @keyframes highlightFade {
+      0% { background: rgba(16, 185, 129, 0.28); }
+      100% { background: transparent; }
+    }
+    .btn-action-glow {
+      background: linear-gradient(135deg, #10b981, #06b6d4);
+      color: #fff;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);
+      transition: all 0.25s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-action-glow:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 24px rgba(16, 185, 129, 0.65);
+    }
   </style>
 </head>
 <body>
@@ -590,7 +1656,12 @@
     <div class="doctor-avatar-sm" id="sidebarAvatar">DR</div>
     <div class="dname" id="sidebarDoctorName">—</div>
     <div class="dspec" id="sidebarSpec">—</div>
-    <span class="dstatus">Active</span>
+    <button id="sidebarDutyToggle" class="duty-toggle-btn sidebar-duty-btn active" onclick="toggleDoctorDutyStatus()" type="button" title="Click to toggle Duty Status">
+      <span class="duty-toggle-track">
+        <span class="duty-toggle-thumb"></span>
+      </span>
+      <span class="duty-status-text" id="sidebarDutyStatusText">Active / On Duty</span>
+    </button>
   </div>
   <nav class="sidebar-nav">
     <a class="nav-item active" onclick="switchTab('overview',this)">
@@ -611,14 +1682,19 @@
     <a class="nav-item" onclick="switchTab('profile',this)">
       <span class="icon">👤</span> My Profile
     </a>
-    <a class="nav-item" onclick="switchTab('billing',this)">
-      <span class="icon">💳</span> Billing & Invoices
-    </a>
     <a class="nav-item" onclick="switchTab('vitals',this)">
       <span class="icon">💓</span> Patient Vitals
     </a>
   </nav>
-  <div class="sidebar-footer">
+    <div class="sidebar-footer">
+    {% if is_admin %}
+    <a href="/admin_dashboard" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:9px 12px; margin-bottom:8px; background:linear-gradient(135deg, rgba(244,63,94,0.2), rgba(236,72,153,0.2)); border:1px solid rgba(244,63,94,0.4); border-radius:8px; color:#fda4af; font-weight:700; font-size:12px; text-decoration:none; transition:all 0.2s;">
+      <span>🛡️</span> Admin Master Portal
+    </a>
+    <a href="/app" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:8px 12px; margin-bottom:8px; background:rgba(99,102,241,0.15); border:1px solid #6366f1; border-radius:8px; color:#a5b4fc; font-weight:600; font-size:12px; text-decoration:none;">
+      <span>⚙️</span> Frappe Desk
+    </a>
+    {% endif %}
     <button class="logout-btn" onclick="confirmAndLogout()">
       <span>⏻</span> Sign Out
     </button>
@@ -626,13 +1702,212 @@
 </aside>
 
 <main class="main">
-  <div class="topbar">
-    <h1 id="pageTitle">Doctor Dashboard</h1>
-    <span class="date" id="todayDate"></span>
+  <div class="topbar" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+      <div>
+        <h1 id="pageTitle" style="margin-bottom:2px;">Doctor Dashboard</h1>
+        <span class="date" id="todayDate"></span>
+      </div>
+      <!-- Header Doctor Duty Status Interactive Toggle -->
+      <button id="headerDutyToggle" class="duty-toggle-btn header-duty-btn active" onclick="toggleDoctorDutyStatus()" type="button" title="Click to toggle Duty Status">
+        <span class="duty-toggle-track">
+          <span class="duty-toggle-thumb"></span>
+        </span>
+        <span class="duty-status-text" id="headerDutyStatusText">Active / On Duty</span>
+      </button>
+    </div>
+    {% if is_admin and all_doctors %}
+    <div class="admin-desk-selector" style="display:inline-flex; align-items:center; gap:8px; margin-left:auto; background:rgba(30,41,59,0.85); border:1px solid rgba(255,255,255,0.12); padding:6px 14px; border-radius:12px; backdrop-filter:blur(10px); position:relative; flex-wrap:wrap;">
+      <span style="font-size:11px; color:#fb7185; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
+        <span>🛡️</span> Viewing Desk:
+      </span>
+
+      <!-- Search Input for Doctor Switcher -->
+      <div class="viewing-doctor-search-wrap" style="position:relative; display:inline-flex; align-items:center;">
+        <span class="viewing-doctor-search-icon">🔍</span>
+        <input 
+          type="text" 
+          id="viewingDoctorSearch" 
+          placeholder="Search doctor by name or dept..." 
+          class="viewing-doctor-search-input"
+          autocomplete="off"
+        />
+        <!-- Live autocomplete results dropdown -->
+        <div id="doctorSearchResults" class="doctor-search-results-dropdown" style="display:none;"></div>
+      </div>
+
+      <!-- Doctor Switcher Dropdown (Supports doctorSwitcher & adminDoctorSwitcher) -->
+      <select id="doctorSwitcher" name="adminDoctorSwitcher" onchange="switchDoctorDesk(this.value)" class="viewing-doctor-select">
+        {% for d in all_doctors %}
+        <option value="{{ d.name }}" data-name="{{ (d.doctor_name or d.name)|lower }}" data-dept="{{ (d.department or '')|lower }}" data-spec="{{ (d.specialization or '')|lower }}" {% if doctor and (doctor.name == d.name or doctor.doctor_name == d.doctor_name) %}selected{% endif %}>
+          {{ d.formatted_name }} ({{ d.specialization or d.department or 'General' }})
+        </option>
+        {% endfor %}
+      </select>
+
+      <a href="/admin_dashboard" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.35); border-radius:8px; color:#fda4af; text-decoration:none; font-size:12px; font-weight:700; transition:all 0.2s; white-space:nowrap;">
+        &larr; Admin Portal
+      </a>
+    </div>
+    <script>
+      function switchDoctorDesk(docName) {
+        if (!docName) return;
+        const cleanName = decodeURIComponent(docName);
+        window.location.href = '/doctor_dashboard?doctor=' + encodeURIComponent(cleanName);
+      }
+      window.switchDoctorDesk = switchDoctorDesk;
+
+      // Live Filtering Functionality for Doctor Switcher
+      function initViewingDoctorSearch() {
+        const searchInput = document.getElementById('viewingDoctorSearch');
+        const switcherSelect = document.getElementById('doctorSwitcher') || document.getElementById('adminDoctorSwitcher');
+        const resultsDropdown = document.getElementById('doctorSearchResults');
+        if (!searchInput || !switcherSelect) return;
+
+        // Alias for backward compatibility
+        window.adminDoctorSwitcher = switcherSelect;
+
+        // Cache all initial doctor options
+        const originalDoctors = Array.from(switcherSelect.options).map(opt => ({
+          value: opt.value,
+          text: opt.textContent.trim(),
+          name: opt.getAttribute('data-name') || opt.textContent.toLowerCase(),
+          dept: opt.getAttribute('data-dept') || '',
+          spec: opt.getAttribute('data-spec') || '',
+          selected: opt.selected
+        }));
+
+        function filterDoctors(rawQuery) {
+          const q = (rawQuery || '').trim().toLowerCase();
+
+          // 1. Dynamically filter options in the #doctorSwitcher dropdown
+          switcherSelect.innerHTML = '';
+          const matchedDocs = [];
+
+          originalDoctors.forEach(doc => {
+            const matchName = doc.name.includes(q);
+            const matchText = doc.text.toLowerCase().includes(q);
+            const matchDept = doc.dept.includes(q);
+            const matchSpec = doc.spec.includes(q);
+            const matchVal = doc.value.toLowerCase().includes(q);
+
+            if (!q || matchName || matchText || matchDept || matchSpec || matchVal) {
+              matchedDocs.push(doc);
+              const opt = document.createElement('option');
+              opt.value = doc.value;
+              opt.textContent = doc.text;
+              opt.setAttribute('data-name', doc.name);
+              opt.setAttribute('data-dept', doc.dept);
+              opt.setAttribute('data-spec', doc.spec);
+              if (doc.selected) opt.selected = true;
+              switcherSelect.appendChild(opt);
+            }
+          });
+
+          // 2. Render live floating autocomplete dropdown
+          if (!resultsDropdown) return;
+
+          if (!q) {
+            resultsDropdown.style.display = 'none';
+            resultsDropdown.innerHTML = '';
+            return;
+          }
+
+          if (matchedDocs.length === 0) {
+            resultsDropdown.innerHTML = '<div class="doc-search-empty">No matching doctors found</div>';
+            resultsDropdown.style.display = 'flex';
+            return;
+          }
+
+          resultsDropdown.innerHTML = matchedDocs.map((doc, idx) => {
+            const isSelected = doc.selected;
+            const parts = doc.text.split('(');
+            const docDisplayName = parts[0].trim();
+            const docSubtitle = parts[1] ? '(' + parts[1] : (doc.spec || doc.dept || 'General');
+
+            return `
+              <div class="doc-search-item ${isSelected ? 'active-doctor' : ''} ${idx === 0 ? 'highlighted' : ''}" 
+                   data-id="${doc.value}"
+                   title="Switch to ${escapeDocHtml(docDisplayName)}">
+                <div class="doc-search-info">
+                  <span class="doc-search-name">${escapeDocHtml(docDisplayName)}</span>
+                  <span class="doc-search-meta">${escapeDocHtml(docSubtitle)}</span>
+                </div>
+                ${isSelected ? '<span class="doc-search-badge badge-current-desk">Active Desk</span>' : ''}
+              </div>
+            `;
+          }).join('');
+
+          resultsDropdown.style.display = 'flex';
+
+          // Attach click listeners to generated results
+          resultsDropdown.querySelectorAll('.doc-search-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const selectedId = this.getAttribute('data-id');
+              if (selectedId) switchDoctorDesk(selectedId);
+            });
+          });
+        }
+
+        function escapeDocHtml(str) {
+          if (!str) return '';
+          return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        }
+
+        // Live input filter
+        searchInput.addEventListener('input', function() {
+          filterDoctors(this.value);
+        });
+
+        // Focus show if already has value
+        searchInput.addEventListener('focus', function() {
+          if (this.value.trim()) {
+            filterDoctors(this.value);
+          }
+        });
+
+        // Keyboard navigation (Enter to select, Escape to dismiss)
+        searchInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape') {
+            if (resultsDropdown) resultsDropdown.style.display = 'none';
+            this.blur();
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const highlighted = resultsDropdown ? resultsDropdown.querySelector('.doc-search-item.highlighted') || resultsDropdown.querySelector('.doc-search-item') : null;
+            if (highlighted) {
+              const docId = highlighted.getAttribute('data-id');
+              if (docId) switchDoctorDesk(docId);
+            } else if (switcherSelect.value) {
+              switchDoctorDesk(switcherSelect.value);
+            }
+          }
+        });
+
+        // Click outside to dismiss popup
+        document.addEventListener('click', function(e) {
+          if (!searchInput.contains(e.target) && (!resultsDropdown || !resultsDropdown.contains(e.target))) {
+            if (resultsDropdown) resultsDropdown.style.display = 'none';
+          }
+        });
+      }
+
+      // Initialize on DOM ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initViewingDoctorSearch);
+      } else {
+        initViewingDoctorSearch();
+      }
+    </script>
+    {% endif %}
   </div>
 
   <div id="loading">
-    <div class="spinner"></div>
+    <div class="spinner" id="loadingSpinner"></div>
     <p>Loading your clinical dashboard…</p>
   </div>
 
@@ -681,6 +1956,7 @@
         <button class="tab-btn" onclick="switchTab('prescriptions',this)">Prescriptions</button>
         <button class="tab-btn" onclick="switchTab('records',this)">Records</button>
         <button class="tab-btn" onclick="switchTab('profile',this)">Profile</button>
+        <button class="tab-btn" onclick="switchTab('vitals',this)">Patient Vitals</button>
       </div>
 
       <div class="tab-panel active" id="panel-overview">
@@ -737,13 +2013,21 @@
 
       <div class="tab-panel" id="panel-prescriptions">
         <div class="section">
-          <div class="section-header">
+          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
             <div class="section-title"><span class="icon">💊</span> Prescriptions Written <span class="badge" id="rx-count">0</span></div>
+            <div style="display:flex; gap:10px;">
+              <button class="btn-action" style="background:var(--indigo); color:#fff; border:none; padding:8px 16px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="openGenericRxModal()">+ New E-Prescription</button>
+            </div>
           </div>
           <div class="table-card">
             <table>
               <thead><tr>
-                <th>Date</th><th>Patient</th><th>Medicine</th><th>Dosage</th><th>Frequency</th><th style="text-align:right">Action</th>
+                <th>Rx ID & Date</th>
+                <th>Patient</th>
+                <th>Prescribed Medicines</th>
+                <th>Dispense Status</th>
+                <th>Pharmacy Bill</th>
+                <th style="text-align:right">Action</th>
               </tr></thead>
               <tbody id="rx-tbody"></tbody>
             </table>
@@ -753,13 +2037,16 @@
 
       <div class="tab-panel" id="panel-records">
         <div class="section">
-          <div class="section-header">
-            <div class="section-title"><span class="icon">📋</span> Medical Records <span class="badge" id="rec-count">0</span></div>
+          <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+            <div class="section-title" style="margin-bottom:0;"><span class="icon">📋</span> Medical Records <span class="badge" id="rec-count">0</span></div>
+            <button class="btn-action-glow" id="btnAddMedicalRecord" onclick="openAddMedicalRecordModal()">
+              <span style="font-size:16px; font-weight:900; line-height:1;">+</span> Add Medical Record
+            </button>
           </div>
           <div class="table-card">
             <table>
               <thead><tr>
-                <th>Visit Date</th><th>Patient</th><th>Symptoms</th><th>Diagnosis</th><th>Treatment</th>
+                <th>Visit Date</th><th>Patient</th><th>Symptoms</th><th>Diagnosis</th><th>Treatment</th><th style="text-align:right">Action</th>
               </tr></thead>
               <tbody id="rec-tbody"></tbody>
             </table>
@@ -790,7 +2077,7 @@
             <button class="btn-action" style="background:var(--indigo); color:#fff; padding:8px 16px; border-radius:8px; font-weight:600; cursor:pointer;" onclick="openGenericVitalsModal()">+ Record Patient Vitals</button>
           </div>
           <div class="table-card">
-            <table>
+            <table id="vitals-timeline-table">
               <thead>
                 <tr>
                   <th>Recorded At</th>
@@ -812,46 +2099,96 @@
         </div>
       </div>
 
-      <div class="tab-panel" id="panel-billing">
-        <div class="section">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
-            <div class="section-title"><span class="icon">💳</span> Consultation & Patient Invoices</div>
-            <a href="/billing" class="btn-action" style="background:var(--indigo); color:#fff; padding:8px 16px; border-radius:8px; text-decoration:none; font-weight:600;">Open Receptionist & Billing Portal ↗</a>
-          </div>
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
-            <div style="background:var(--surface2); padding:18px; border-radius:12px; border:1px solid var(--border);">
-              <div style="color:var(--text-dim); font-size:12px; text-transform:uppercase; font-weight:600;">Total Invoiced</div>
-              <div style="font-size:24px; font-weight:800; color:var(--text); margin-top:6px;" id="doctorBilledTotal">₹0.00</div>
-            </div>
-            <div style="background:var(--surface2); padding:18px; border-radius:12px; border:1px solid var(--border);">
-              <div style="color:var(--text-dim); font-size:12px; text-transform:uppercase; font-weight:600;">Total Invoices</div>
-              <div style="font-size:24px; font-weight:800; color:var(--text); margin-top:6px;" id="doctorInvoicesCount">0</div>
-            </div>
-          </div>
-          <div class="table-card">
-            <table>
-              <thead>
-                <tr>
-                  <th>Invoice ID</th>
-                  <th>Date</th>
-                  <th>Patient</th>
-                  <th>Grand Total</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="doctor-billing-tbody">
-                <tr><td colspan="6" style="text-align:center; padding:24px; color:var(--text-dim);">Loading billing records…</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
+</main>
+
+  <!-- CarePlus Add Medical Record Modal -->
+  <div class="modal-overlay" id="addMedicalRecordModal" style="display:none; z-index:1100;">
+    <div class="modal-card" style="max-width:640px; width:95%; max-height:92vh; overflow-y:auto; background:var(--surface); border:1px solid var(--border); box-shadow:0 24px 48px rgba(0,0,0,0.6); backdrop-filter:blur(14px); border-radius:16px; padding:24px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+        <h3 style="margin:0; font-size:18px; color:var(--text); display:flex; align-items:center; gap:10px;">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">📋</span>
+          New Medical Record
+        </h3>
+        <button type="button" onclick="closeAddMedicalRecordModal()" style="background:transparent; border:none; color:var(--text-dim); font-size:22px; cursor:pointer; line-height:1; transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-dim)'">✕</button>
+      </div>
+
+      <form id="addMedicalRecordForm" onsubmit="handleCreateMedicalRecordSubmit(event)">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
+          <div class="form-group" style="margin-bottom:0; display:flex; flex-direction:column; justify-content:flex-end;">
+            <label style="display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:600; color:var(--text-dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">
+              <span>Select Patient *</span>
+              <span id="selectedPatientBadge" style="display:none; font-size:11px; color:#10b981; font-weight:700; text-transform:none; background:rgba(16,185,129,0.15); padding:2px 8px; border-radius:10px; border:1px solid rgba(16,185,129,0.3);">✓ Selected</span>
+            </label>
+            <div style="position:relative; margin-bottom:6px;">
+              <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--text-dim); pointer-events:none;">🔍</span>
+              <input type="text" id="patientSearchFilter" placeholder="Search patient by name or ID..." oninput="filterMedicalRecordPatients(this.value)" autocomplete="off" style="width:100%; padding:8px 12px 8px 30px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none; transition:all 0.2s ease;">
+            </div>
+            <select id="medRecPatientSelect" name="recordPatient" required onchange="onMedicalRecordPatientSelected(this.value)" style="width:100%; padding:9px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none; transition:border-color 0.2s;">
+              <option value="">— Select Patient —</option>
+            </select>
+            <input type="hidden" id="recordPatient" value="">
+          </div>
+          <div class="form-group" style="margin-bottom:0; display:flex; flex-direction:column; justify-content:flex-end;">
+            <label style="display:block; font-size:12px; font-weight:600; color:var(--text-dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Visit Date *</label>
+            <input type="date" id="medRecVisitDate" required style="width:100%; padding:9px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none; transition:border-color 0.2s;">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Symptoms *</label>
+          <textarea id="medRecSymptoms" rows="3" required placeholder="e.g. Mild chest discomfort on exertion, fatigue, dry cough..." style="width:100%; padding:10px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none; resize:vertical; font-family:inherit;"></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Diagnosis *</label>
+          <textarea id="medRecDiagnosis" rows="2" required placeholder="e.g. Atypical Chest Pain - Musculoskeletal / Viral Pharyngitis..." style="width:100%; padding:10px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none; resize:vertical; font-family:inherit;"></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom:18px;">
+          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Treatment / Clinical Notes *</label>
+          <textarea id="medRecTreatment" rows="3" required placeholder="e.g. Prescribed Paracetamol 500mg TDS for 3 days. Advised rest and hydration..." style="width:100%; padding:10px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none; resize:vertical; font-family:inherit;"></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); padding-top:14px;">
+          <button type="button" onclick="closeAddMedicalRecordModal()" style="padding:10px 18px; border-radius:8px; background:var(--surface2); border:1px solid var(--border); color:var(--text-dim); font-size:13px; font-weight:600; cursor:pointer;">Cancel</button>
+          <button type="submit" id="btnSubmitMedRec" style="padding:10px 22px; border-radius:8px; background:linear-gradient(135deg, #10b981, #06b6d4); border:none; color:#fff; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 0 15px rgba(16,185,129,0.35); display:inline-flex; align-items:center; gap:8px;">
+            <span>💾 Save Medical Record</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CarePlus View Medical Record Details Modal -->
+  <div class="modal-overlay" id="viewMedicalRecordModal" style="display:none; z-index:1100;">
+    <div class="modal-card" style="max-width:650px; width:95%; max-height:92vh; overflow-y:auto; background:var(--surface); border:1px solid var(--border); box-shadow:0 24px 48px rgba(0,0,0,0.6); backdrop-filter:blur(14px); border-radius:16px; padding:24px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+        <h3 style="margin:0; font-size:18px; color:var(--text); display:flex; align-items:center; gap:10px;">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; background:rgba(99,102,241,0.15); color:#818cf8; border:1px solid rgba(99,102,241,0.3);">📄</span>
+          Medical Record Summary
+        </h3>
+        <button type="button" onclick="closeViewMedicalRecordModal()" style="background:transparent; border:none; color:var(--text-dim); font-size:22px; cursor:pointer; line-height:1;">✕</button>
+      </div>
+
+      <div id="medRecDetailsContent" style="color:var(--text); font-size:13px; line-height:1.6;">
+        <!-- Injected dynamically -->
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:14px; margin-top:18px;">
+        <button type="button" onclick="printCurrentMedicalRecord()" style="padding:9px 18px; border-radius:8px; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.3); color:#38bdf8; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+          🖨️ Print Summary
+        </button>
+        <button type="button" onclick="closeViewMedicalRecordModal()" style="padding:9px 18px; border-radius:8px; background:var(--surface2); border:1px solid var(--border); color:var(--text-dim); font-size:13px; font-weight:600; cursor:pointer;">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Patient Vitals Entry Modal -->
-  <div class="modal-overlay" id="vitalsModal" style="display:none; z-index:1100;">
+  <div class="modal-overlay" id="vitalsModal" style="display:none; z-index:1100;">"modal-overlay" id="vitalsModal" style="display:none; z-index:1100;">
     <div class="modal-card" style="max-width:700px; max-height:92vh; overflow-y:auto;">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:16px;">
         <h3 style="margin:0;"><span class="icon">💓</span> Record Patient Vitals <span id="vitalsModalPatient" style="color:var(--indigo); font-size:14px;"></span></h3>
@@ -964,76 +2301,278 @@
     </div>
   </div>
 
-  <!-- Doctor Invoice Slip Modal -->
-  <div class="modal-overlay" id="doctorSlipModal" style="display:none;">
-    <div class="modal-card" style="max-width:680px; max-height:90vh; overflow-y:auto;">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:16px;">
-        <h3 style="margin:0;">Invoice Slip <span id="doctorSlipId" style="color:var(--indigo);">—</span></h3>
-        <button class="btn-action" onclick="closeDoctorSlipModal()" style="font-size:18px; padding:4px 8px; border:none; background:transparent; color:var(--text-dim); cursor:pointer;">✕</button>
-      </div>
-      <div id="doctorSlipContent">
-        <div style="text-align:center; padding:24px; color:var(--text-dim);">Loading slip details...</div>
-      </div>
-      <div class="modal-actions" style="margin-top:20px; border-top:1px solid var(--border); padding-top:12px;">
-        <button type="button" class="btn-action" onclick="window.print()" style="background:var(--blue); color:#fff; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">🖨️ Print Slip</button>
-        <button type="button" class="btn-action btn-cancel" onclick="closeDoctorSlipModal()">Close</button>
-      </div>
+  <div class="modal-overlay" id="rxModal">
+  <div class="modal-card" style="max-width:960px; width:95%; max-height:92vh; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+      <h3 style="margin:0; font-size:18px; display:flex; align-items:center; gap:8px;">
+        <span>💊</span> Doctor E-Prescription Studio <span id="rxModalPatient" style="font-size:13px; font-weight:500; color:var(--blue); background:rgba(56,189,248,0.1); padding:3px 10px; border-radius:12px; border:1px solid rgba(56,189,248,0.2);">Patient: —</span>
+      </h3>
+      <button type="button" onclick="closeRxModal()" style="background:transparent; border:none; color:var(--text-dim); font-size:22px; cursor:pointer; line-height:1;">✕</button>
     </div>
-  </div>
-</main>
 
-<div class="modal-overlay" id="rxModal">
-  <div class="modal-card" style="max-width:650px;">
-    <h3>Write Prescription <span id="rxModalPatient">Patient: —</span></h3>
     <!-- Patient Latest Vitals & Blood Sugar Consultation Card -->
-    <div id="rxVitalsPreviewCard" style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:16px;"></div>
+    <div id="rxVitalsPreviewCard" style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:10px 14px; margin-bottom:14px;"></div>
+
     <form id="rxForm" onsubmit="submitPrescription(event)">
       <input type="hidden" id="rxPatientId">
       <input type="hidden" id="rxAppointmentId">
 
-      <div class="form-group">
-        <label>Medicine *</label>
-        <select id="rxMedicine" class="form-control" required>
-          <option value="">-- Select Medicine --</option>
-        </select>
+      <!-- Patient & Appointment details row -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label style="font-size:12px; font-weight:600; color:var(--text-dim); margin-bottom:4px; display:block;">Clinical Diagnosis / Consultation Notes</label>
+          <input type="text" id="rxDiagnosisNotes" class="form-control" placeholder="e.g. Acute viral pharyngitis with mild dehydration..." style="width:100%; padding:8px 12px; background:var(--surface3); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px;">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label style="font-size:12px; font-weight:600; color:var(--text-dim); margin-bottom:4px; display:block;">Pharmacy Transmit Routing</label>
+          <div style="padding:9px 12px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.25); border-radius:6px; font-size:12px; color:var(--indigo); display:flex; align-items:center; gap:6px;">
+            <span>⚡</span> Auto-transmits to CarePlus Central Pharmacy Desk (Status: Pending Dispense)
+          </div>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label>Dosage</label>
-        <input type="text" id="rxDosage" class="form-control" placeholder="e.g. 1 tablet" value="1 tablet">
+      <!-- Prescribed Medicines Dynamic Items Table -->
+      <div style="margin-top:14px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="font-size:13px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:6px;">
+            <span>📋</span> Prescribed Medications (<span id="rxItemRowCount">0</span>)
+          </label>
+          <button type="button" class="btn-action" id="btnAddRxMedicine" onclick="addRxMedicineRow()" style="background:rgba(56,189,248,0.12); color:var(--blue); border:1px solid rgba(56,189,248,0.3); padding:5px 14px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+            + Add Another Medicine
+          </button>
+        </div>
+
+        <div style="overflow-x:auto; border:1px solid var(--border); border-radius:8px; background:var(--surface2);">
+          <table style="width:100%; border-collapse:collapse; font-size:12px;" class="rx-dynamic-table" id="rxDynamicTable">
+            <thead>
+              <tr style="background:var(--surface3); color:var(--text-dim); text-align:left; border-bottom:1px solid var(--border);">
+                <th style="padding:8px 10px; width:28%;">Medicine *</th>
+                <th style="padding:8px 6px; width:13%;">Dosage</th>
+                <th style="padding:8px 6px; width:16%;">Frequency</th>
+                <th style="padding:8px 6px; width:10%;">Duration (Days)</th>
+                <th style="padding:8px 6px; width:14%;">Timing</th>
+                <th style="padding:8px 6px; width:11%;">Total Units *</th>
+                <th style="padding:8px 6px; width:6%; text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="rxRowsTbody">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label>Frequency *</label>
-        <select id="rxFrequency" class="form-control" required>
-          <option value="Once Daily">Once Daily</option>
-          <option value="Twice Daily">Twice Daily</option>
-          <option value="Thrice Daily">Thrice Daily</option>
-          <option value="As Needed" selected>As Needed</option>
-        </select>
+      <!-- Real-time Cost & Units Summary Strip -->
+      <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface3); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:16px;">
+        <div style="display:flex; gap:16px; font-size:12px; color:var(--text-dim);">
+          <div>Total Medicines: <strong id="rxSummaryCount" style="color:var(--text);">0</strong></div>
+          <div>Total Quantity: <strong id="rxSummaryUnits" style="color:var(--text);">0 units</strong></div>
+        </div>
+        <div style="font-size:13px; font-weight:700; color:var(--green);">
+          Estimated Cost: <span id="rxSummaryCost">Rs. 0.00</span>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label>Quantity *</label>
-        <input type="number" id="rxQuantity" class="form-control" value="1" min="1" step="1" required>
-      </div>
-
-      <div class="form-group">
-        <label>Instructions</label>
-        <input type="text" id="rxInstructions" class="form-control" placeholder="e.g. After food" value="After food">
-      </div>
-
-      <div class="modal-actions">
-        <button type="button" class="btn-close" onclick="closeRxModal()">Cancel</button>
-        <button type="submit" class="btn-submit-rx" id="rxSubmitBtn">Save Prescription</button>
+      <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:10px;">
+        <button type="button" class="btn-close" onclick="closeRxModal()" style="padding:8px 16px; border-radius:6px; border:1px solid var(--border); background:var(--surface3); color:var(--text); cursor:pointer;">Cancel</button>
+        <button type="submit" class="btn-submit-rx" id="rxSubmitBtn" style="padding:8px 22px; border-radius:6px; border:none; background:linear-gradient(135deg, var(--indigo), var(--indigo-dim)); color:#fff; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+          <span>💊</span> Issue E-Prescription & Transmit
+        </button>
       </div>
     </form>
   </div>
 </div>
 
+<!-- Modern Rx Success Toast / Modal Alert -->
+<div class="modal-overlay" id="rxSuccessModal" style="display:none; z-index:9999;">
+  <div class="modal-card" style="max-width:480px; text-align:center; padding:28px 24px; border:1px solid rgba(74,222,128,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="font-size:44px; margin-bottom:10px;">🎉</div>
+    <h3 style="font-size:20px; font-weight:700; color:var(--text); margin-bottom:4px;">E-Prescription Issued!</h3>
+    <p style="color:var(--text-dim); font-size:13px; margin-bottom:16px;" id="rxSuccessSubtext">
+      Prescription recorded and transmitted to Central Pharmacy.
+    </p>
+
+    <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:12px 16px; margin-bottom:20px; text-align:left; font-size:13px;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+        <span style="color:var(--text-dim);">Prescription ID:</span>
+        <strong id="rxSuccessId" style="color:var(--blue);">—</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+        <span style="color:var(--text-dim);">Dispense Status:</span>
+        <span style="color:#fbbf24; font-weight:600;">⏳ Pending Dispense</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:var(--text-dim);">Pharmacy Desk:</span>
+        <span style="color:var(--green); font-weight:600;">In Queue for Dispensing</span>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <button type="button" id="rxSuccessPrintBtn" style="padding:11px 16px; border-radius:8px; background:var(--blue); color:#0a0e1a; font-weight:700; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; font-size:14px;">
+        🖨️ View / Print Branded Rx Slip (PDF)
+      </button>
+      <div>
+        <button type="button" onclick="closeRxSuccessModal()" style="width:100%; padding:10px 16px; border-radius:8px; background:var(--surface3); border:1px solid var(--border); color:var(--text); cursor:pointer; font-size:13px; font-weight:600;">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Patient Medical History Timeline Slide-over Drawer -->
+<div class="timeline-drawer-backdrop" id="timelineDrawerBackdrop" onclick="closePatientTimeline()"></div>
+
+<div class="timeline-drawer" id="patientTimelineDrawer" role="dialog" aria-modal="true" aria-labelledby="timelinePatientName">
+  <!-- Drawer Header -->
+  <div class="timeline-drawer-header">
+    <div class="timeline-header-top">
+      <div class="timeline-patient-profile">
+        <div class="timeline-avatar" id="timelineAvatar">?</div>
+        <div>
+          <div class="timeline-patient-name">
+            <span id="timelinePatientName">Loading Patient…</span>
+            <span class="timeline-sub-badge" id="timelinePatientId">—</span>
+          </div>
+          <div class="timeline-patient-sub" id="timelinePatientMeta">
+            <span>Retrieving clinical record…</span>
+          </div>
+        </div>
+      </div>
+      <button class="timeline-close-btn" onclick="closePatientTimeline()" title="Close Drawer (Esc)">✕</button>
+    </div>
+
+    <!-- Quick Metrics Strip -->
+    <div class="timeline-metrics-grid">
+      <div class="timeline-metric-chip">
+        <div class="timeline-metric-val" id="metricTotalVisits">0</div>
+        <div class="timeline-metric-lbl">Total Visits</div>
+      </div>
+      <div class="timeline-metric-chip">
+        <div class="timeline-metric-val" id="metricPrescriptions">0</div>
+        <div class="timeline-metric-lbl">Prescriptions</div>
+      </div>
+      <div class="timeline-metric-chip">
+        <div class="timeline-metric-val" id="metricVitals">0</div>
+        <div class="timeline-metric-lbl">Vitals Logged</div>
+      </div>
+      <div class="timeline-metric-chip">
+        <div class="timeline-metric-val" id="metricLastSeen">—</div>
+        <div class="timeline-metric-lbl">Last Seen</div>
+      </div>
+    </div>
+
+    <!-- Filter Pills -->
+    <div class="timeline-filter-bar">
+      <button class="timeline-pill active" onclick="filterTimeline('all', this)">All Events (<span id="countAll">0</span>)</button>
+      <button class="timeline-pill" onclick="filterTimeline('appointment', this)">📅 Visits (<span id="countAppts">0</span>)</button>
+      <button class="timeline-pill" onclick="filterTimeline('prescription', this)">💊 Prescriptions (<span id="countRxs">0</span>)</button>
+      <button class="timeline-pill" onclick="filterTimeline('medical_record', this)">🩺 Diagnoses (<span id="countRecs">0</span>)</button>
+      <button class="timeline-pill" onclick="filterTimeline('vitals', this)">💓 Vitals (<span id="countVitals">0</span>)</button>
+    </div>
+  </div>
+
+  <!-- Drawer Body -->
+  <div class="timeline-drawer-body" id="timelineDrawerBody">
+    <div class="timeline-loading-box" id="timelineLoadingBox">
+      <div class="timeline-spinner"></div>
+      <div style="font-weight:600; color:var(--text); margin-bottom:4px;">Retrieving Medical History…</div>
+      <div style="font-size:12px; color:var(--text-dim);">Aggregating appointments, prescriptions, diagnoses, and vitals</div>
+    </div>
+
+    <div class="timeline-stream" id="timelineStream" style="display:none;"></div>
+
+    <div class="timeline-empty-state" id="timelineEmptyState" style="display:none;">
+      <div class="timeline-empty-icon">📋</div>
+      <div class="timeline-empty-title">No Medical History Found</div>
+      <div class="timeline-empty-desc">There are no prior clinical consultations, prescriptions, or recorded vitals for this patient.</div>
+    </div>
+  </div>
+</div>
+
+
+
 <script>
+
+  let activeTimelineEvents = [];
+  let currentTimelineFilter = 'all';
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function renderPatientClickable(patientName, isStrong = false) {
+    if (!patientName) return '—';
+    const clean = escapeHtml(String(patientName));
+    const safeParam = encodeURIComponent(String(patientName)).replace(/'/g, '%27');
+    const tag = isStrong ? 'strong' : 'span';
+    return `<${tag} class="patient-timeline-trigger" onclick="openPatientTimeline(decodeURIComponent('${safeParam}'))" title="Click to view Patient Medical History Timeline">${clean}</${tag}>`;
+  }
+
   const $ = id => document.getElementById(id);
   const fmt = v => v || '—';
+
+  // ==========================================================================
+  // GLOBAL UI & NAVIGATION UTILITIES (WINDOW SCOPE)
+  // ==========================================================================
+  function hideLoading() {
+    const loading = document.getElementById('loading');
+    if (loading) loading.style.display = 'none';
+    const spinner = document.getElementById('loadingSpinner') || document.querySelector('#loading .spinner');
+    if (spinner) spinner.style.display = 'none';
+    const dashboard = document.getElementById('dashboard');
+    if (dashboard) dashboard.style.display = 'block';
+  }
+  window.hideLoading = hideLoading;
+
+  function switchTab(tab, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn, .nav-item').forEach(b => b.classList.remove('active'));
+    const panel = document.getElementById('panel-' + tab);
+    if (panel) panel.classList.add('active');
+    if (btn) btn.classList.add('active');
+    // Synchronize active class across matching sidebar items and sub-tab buttons
+    document.querySelectorAll(`.nav-item[onclick*="'${tab}'"], .tab-btn[onclick*="'${tab}'"]`).forEach(el => el.classList.add('active'));
+
+    try {
+      if (tab === 'vitals') {
+        loadVitalsTimeline();
+      }
+    } catch (tabErr) {
+      console.error(`Error loading tab ${tab}:`, tabErr);
+    }
+  }
+  window.switchTab = switchTab;
+
+  async function confirmAndLogout() {
+    const confirmed = await showCarePlusConfirm({
+      title: "Confirm Sign Out",
+      message: "Are you sure you want to end your active clinical session?",
+      subtext: "Any unsaved consultation notes or draft prescriptions will be lost.",
+      icon: "⏻",
+      confirmText: "Sign Out",
+      cancelText: "Cancel",
+      type: "danger"
+    });
+    if (confirmed) {
+      showCarePlusToast("Logged out successfully. Redirecting...", "success", "Signed Out");
+      doLogout();
+    }
+  }
+  window.confirmAndLogout = confirmAndLogout;
+
+  async function doLogout() {
+    try {
+      await fetch('/api/method/hospital_management.api.logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+    window.history.replaceState(null, document.title, '/frontend');
+    window.location.replace('/frontend');
+  }
+  window.doLogout = doLogout;
   const fmtDate = d => d ? new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—';
   const fmtTime = t => t ? t.slice(0,5) : '—';
   const fmtCurr = v => v ? 'Rs.' + parseFloat(v).toLocaleString('en-IN') : '—';
@@ -1046,192 +2585,503 @@
     return `<tr><td colspan="${cols}" class="empty-state"><span class="emoji">📭</span>${msg}</td></tr>`;
   }
 
-  function lockHistory() {
-    window.history.pushState({ page: "doctor_dashboard" }, "", window.location.href);
+  // Explicit event listener binding for '+ Add Another Medicine' button
+  const addRxBtn = document.getElementById('btnAddRxMedicine') || document.querySelector('[onclick*="addRxMedicineRow"], [onclick*="addPrescriptionItemRow"]');
+  if (addRxBtn) {
+    addRxBtn.addEventListener('click', function(e) {
+      if (typeof addRxMedicineRow === 'function') {
+        addRxMedicineRow();
+      }
+    });
   }
-  lockHistory();
-
-  window.addEventListener("popstate", function () {
-    lockHistory();
-    setTimeout(() => {
-      if (confirm("Are you sure you want to log out?")) {
-        doLogout();
-      }
-    }, 50);
-  });
-
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Backspace" || e.keyCode === 8) {
-      const target = document.activeElement;
-      const isField = target && (
-        target.tagName === "INPUT" || 
-        target.tagName === "TEXTAREA" || 
-        target.isContentEditable
-      );
-      if (!isField) {
-        e.preventDefault();
-        if (confirm("Are you sure you want to log out?")) {
-          doLogout();
-        }
-      }
-    }
-  });
 
   $('todayDate').textContent = new Date().toLocaleDateString('en-IN', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
 
+  // ─────────────────────────────────────────────
+
+  // ─────────────────────────────────────────────
+  // CarePlus Modal & Toast Notification System
+  // ─────────────────────────────────────────────
+  let _careplusConfirmResolver = null;
+
+  function showCarePlusConfirm({
+    title = "Confirm Action",
+    message = "Are you sure you want to proceed?",
+    subtext = "",
+    icon = "🔔",
+    confirmText = "Confirm",
+    cancelText = "Cancel",
+    type = "primary"
+  } = {}) {
+    return new Promise((resolve) => {
+      _careplusConfirmResolver = resolve;
+
+      const modal = document.getElementById("careplusConfirmModalBackdrop");
+      const iconEl = document.getElementById("careplusModalIcon");
+      const titleEl = document.getElementById("careplusModalTitle");
+      const descEl = document.getElementById("careplusModalDesc");
+      const subtextEl = document.getElementById("careplusModalSubtext");
+      const confirmBtn = document.getElementById("careplusModalConfirmBtn");
+      const cancelBtn = document.getElementById("careplusModalCancelBtn");
+
+      if (iconEl) {
+        iconEl.textContent = icon;
+        iconEl.className = "careplus-modal-header-icon " + (type === 'danger' ? 'danger' : (type === 'success' ? 'success' : ''));
+      }
+      if (titleEl) titleEl.textContent = title;
+      if (descEl) descEl.innerHTML = message;
+      if (subtextEl) {
+        subtextEl.textContent = subtext;
+        subtextEl.style.display = subtext ? "block" : "none";
+      }
+      if (confirmBtn) {
+        confirmBtn.textContent = confirmText;
+        confirmBtn.className = "careplus-btn-confirm " + (type === 'danger' ? 'danger' : (type === 'success' ? 'success' : ''));
+      }
+      if (cancelBtn) {
+        cancelBtn.textContent = cancelText;
+        cancelBtn.style.display = cancelText ? "inline-block" : "none";
+      }
+
+      if (modal) modal.style.display = "flex";
+    });
+  }
+  window.showCarePlusConfirm = showCarePlusConfirm;
+
+  function resolveCareplusConfirm(val) {
+    const modal = document.getElementById("careplusConfirmModalBackdrop");
+    if (modal) modal.style.display = "none";
+    if (_careplusConfirmResolver) {
+      _careplusConfirmResolver(val);
+      _careplusConfirmResolver = null;
+    }
+  }
+  window.resolveCareplusConfirm = resolveCareplusConfirm;
+
+  function handleCareplusModalBackdrop(e) {
+    if (e.target && e.target.id === "careplusConfirmModalBackdrop") {
+      resolveCareplusConfirm(false);
+    }
+  }
+  window.handleCareplusModalBackdrop = handleCareplusModalBackdrop;
+
+  function showCarePlusToast(message, type = "success", title = "") {
+    let container = document.getElementById("careplusToastContainer");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "careplusToastContainer";
+      container.className = "careplus-toast-container";
+      document.body.appendChild(container);
+    }
+
+    const defaultTitles = {
+      success: "Success",
+      warning: "Attention",
+      error: "Alert",
+      info: "Notice"
+    };
+    const icons = {
+      success: "✓",
+      warning: "⚠️",
+      error: "✕",
+      info: "ℹ️"
+    };
+
+    const toastTitle = title || defaultTitles[type] || "Notification";
+    const icon = icons[type] || "🔔";
+
+    const t = document.createElement("div");
+    t.className = `careplus-toast ${type}`;
+    t.innerHTML = `
+      <div class="careplus-toast-icon">${icon}</div>
+      <div class="careplus-toast-body">
+        <div class="careplus-toast-title">${escapeHtml(toastTitle)}</div>
+        <div class="careplus-toast-msg">${message}</div>
+      </div>
+    `;
+    container.appendChild(t);
+
+    setTimeout(() => {
+      t.style.opacity = "0";
+      t.style.transform = "translateX(30px) scale(0.95)";
+      setTimeout(() => t.remove(), 300);
+    }, 3000);
+  }
+  window.showCarePlusToast = showCarePlusToast;
+  window.showToast = showCarePlusToast; // Alias existing calls
+
+  // Override window.alert to completely prevent default browser alert dialogs
+  window.alert = function(msg) {
+    showCarePlusToast(typeof msg === "object" ? JSON.stringify(msg) : String(msg), "warning", "Notice");
+  };
+
+    // CarePlus Doctor Duty Status Toggle & Toast System
+  // ─────────────────────────────────────────────
+  function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    const icon = type === 'success' ? '✓' : (type === 'error' ? '⚠️' : 'ℹ️');
+    t.innerHTML = `<span style="font-size:16px;">${icon}</span><span>${message}</span>`;
+    container.appendChild(t);
+    setTimeout(() => {
+      t.style.opacity = '0';
+      t.style.transform = 'translateY(10px)';
+      setTimeout(() => t.remove(), 300);
+    }, 3800);
+  }
+  window.showToast = showToast;
+
+  function updateDutyStatusUI(isActive) {
+    const active = !!isActive;
+    const label = active ? 'Active / On Duty' : 'Inactive / On Leave';
+
+    const sidebarBtn = document.getElementById('sidebarDutyToggle');
+    const sidebarText = document.getElementById('sidebarDutyStatusText');
+    if (sidebarBtn) {
+      sidebarBtn.classList.toggle('active', active);
+      sidebarBtn.classList.toggle('inactive', !active);
+    }
+    if (sidebarText) sidebarText.textContent = label;
+
+    const headerBtn = document.getElementById('headerDutyToggle');
+    const headerText = document.getElementById('headerDutyStatusText');
+    if (headerBtn) {
+      headerBtn.classList.toggle('active', active);
+      headerBtn.classList.toggle('inactive', !active);
+    }
+    if (headerText) headerText.textContent = label;
+  }
+  window.updateDutyStatusUI = updateDutyStatusUI;
+
+  let isTogglingDuty = false;
+  async function toggleDoctorDutyStatus() {
+    if (isTogglingDuty) return;
+
+    const doc = (globalDoctorData && globalDoctorData.doctor) || {};
+    const docIdentifier = doc.name || doc.doctor_name || "{% if doctor %}{{ doctor.name }}{% endif %}";
+    if (!docIdentifier) {
+      showToast('Doctor record not identified', 'error');
+      return;
+    }
+
+    const currentActive = doc.is_active !== undefined ? (doc.is_active ? 1 : 0) : 1;
+    const targetActive = currentActive ? 0 : 1;
+
+    isTogglingDuty = true;
+    const sidebarBtn = document.getElementById('sidebarDutyToggle');
+    const headerBtn = document.getElementById('headerDutyToggle');
+    if (sidebarBtn) sidebarBtn.style.opacity = '0.5';
+    if (headerBtn) headerBtn.style.opacity = '0.5';
+
+    try {
+      const res = await fetch('/api/method/hospital_management.api.toggle_doctor_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          doctor: docIdentifier,
+          is_active: targetActive
+        })
+      });
+      const data = await res.json();
+      const result = data.message || {};
+
+      if (result.status === 'success') {
+        const newActive = result.is_active;
+        doc.is_active = newActive;
+        if (globalDoctorData && globalDoctorData.doctor) {
+          globalDoctorData.doctor.is_active = newActive;
+        }
+        updateDutyStatusUI(newActive);
+
+        const toastMsg = newActive
+          ? "Status updated: You are now On Duty"
+          : "Status updated: You are now On Leave / Inactive";
+        showToast(toastMsg, newActive ? 'success' : 'warning');
+      } else {
+        throw new Error(result.message || 'Failed to update duty status');
+      }
+    } catch (err) {
+      console.error('Duty toggle error:', err);
+      showToast(err.message || 'Error updating status', 'error');
+    } finally {
+      isTogglingDuty = false;
+      if (sidebarBtn) sidebarBtn.style.opacity = '1';
+      if (headerBtn) headerBtn.style.opacity = '1';
+    }
+  }
+  window.toggleDoctorDutyStatus = toggleDoctorDutyStatus;
+
+  // Initialize duty status on page script load if doctor is available in context
+  {% if doctor and doctor.is_active is defined %}
+  updateDutyStatusUI({{ 1 if doctor.is_active else 0 }});
+  {% endif %}
+
   let globalDoctorData = null;
+  // Cached patients from server context
+  window.cachedPatientsList = {{ (patients or []) | tojson }};
+
+
+  function hideLoading() {
+    const loading = $('loading');
+    if (loading) loading.style.display = 'none';
+    const spinner = $('loadingSpinner') || document.querySelector('#loading .spinner');
+    if (spinner) spinner.style.display = 'none';
+    const dashboard = $('dashboard');
+    if (dashboard) dashboard.style.display = 'block';
+  }
 
   async function loadDoctorDashboard() {
+    let dashboardData = null;
     try {
-      const r = await fetch('/api/method/hospital_management.api.get_doctor_dashboard_data');
+      const urlParams = new URLSearchParams(window.location.search);
+      const docParam = urlParams.get('doctor');
+      const fetchUrl = docParam
+        ? `/api/method/hospital_management.api.get_doctor_dashboard_data?doctor=${encodeURIComponent(docParam)}`
+        : '/api/method/hospital_management.api.get_doctor_dashboard_data';
+      const r = await fetch(fetchUrl);
+      if (!r.ok) {
+        throw new Error(`Server returned HTTP ${r.status}`);
+      }
       const res = await r.json();
-      const d = res.message;
-      if (!d || d.status === 'not_found') {
-        showError('No doctor record is linked to your account. Please contact the administrator.');
-        return;
+      dashboardData = res.message || {};
+      globalDoctorData = dashboardData;
+
+      if (!res.message || dashboardData.status === 'not_found') {
+        showError('No doctor record is linked to your account. Some features may be limited.');
       }
-      globalDoctorData = d;
-      render(d);
-      await loadDoctorBilling(d.doctor);
+
+      // Safely render dashboard cards and appointment tables with returned or default partial data
+      render(dashboardData);
+
+      // Load sub-modules safely without blocking dashboard render
+      try { loadVitalsTimeline(); } catch (e) { console.warn('Could not load vitals timeline:', e); }
     } catch (err) {
-      showError('Could not load your dashboard. Please refresh.');
-      console.error(err);
-      if ($('doctor-billing-tbody')) {
-        $('doctor-billing-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--rose);">⚠️ Error loading billing records.</td></tr>';
+      console.error('Error loading doctor dashboard:', err);
+      showError('Could not load your dashboard. Displaying available clinical views.');
+      // Ensure the dashboard main cards and appointment tables are displayed even if partial data or error returned
+      try {
+        render(globalDoctorData || dashboardData || {});
+      } catch (renderErr) {
+        console.error('Fallback render error:', renderErr);
       }
+
+    } finally {
+      // Hide the loading spinner / element and ensure the dashboard is displayed
+      hideLoading();
     }
   }
 
   function showError(msg) {
-    $('loading').style.display = 'none';
+    hideLoading();
     const el = $('error-msg');
-    el.textContent = 'Alert: ' + msg;
-    el.style.display = 'block';
+    if (el) {
+      el.textContent = 'Alert: ' + msg;
+      el.style.display = 'block';
+    }
   }
 
   function render(data) {
-    const doc = data.doctor;
-    const stats = data.stats;
+    if (!data) data = {};
+    // Clear previous error message banner if rendering succeeded and not 'not_found'
+    if ($('error-msg') && data.status !== 'not_found') $('error-msg').style.display = 'none';
 
-    const initials = (doc.doctor_name || 'Dr').replace('Dr.','').trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) || 'DR';
-    $('sidebarAvatar').textContent = initials;
-    $('sidebarDoctorName').textContent = doc.doctor_name || '—';$('sidebarSpec').textContent = doc.specialization || doc.department || '—';
+    const doc = data.doctor || {};
+    const stats = data.stats || {};
 
-    $('doctorTitle').textContent = doc.doctor_name || 'Doctor';
-    if (doc.department || doc.specialization) {
+    function formatDoctorDisplayName(name) {
+      if (!name) return 'Doctor';
+      let clean = name.trim();
+      while (/^dr\.?\s+/i.test(clean)) {
+        clean = clean.replace(/^dr\.?\s+/i, '').trim();
+      }
+      return clean ? 'Dr. ' + clean : 'Doctor';
+    }
+
+    const rawDocName = doc.doctor_name || doc.formatted_name || 'Dr';
+    let cleanInitials = rawDocName.trim();
+    while (/^dr\.?\s+/i.test(cleanInitials)) {
+      cleanInitials = cleanInitials.replace(/^dr\.?\s+/i, '').trim();
+    }
+    const initials = (cleanInitials.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)) || 'DR';
+    const displayName = formatDoctorDisplayName(doc.formatted_name || doc.doctor_name);
+
+    if ($('sidebarAvatar')) $('sidebarAvatar').textContent = initials;
+    if ($('sidebarDoctorName')) $('sidebarDoctorName').textContent = displayName;
+    if ($('sidebarSpec')) $('sidebarSpec').textContent = doc.specialization || doc.department || '—';
+    updateDutyStatusUI(doc.is_active !== undefined ? (doc.is_active ? 1 : 0) : 1);
+
+    if ($('doctorTitle')) $('doctorTitle').textContent = displayName;
+    if ($('deptLine')) {
       $('deptLine').textContent = (doc.specialization || '') + (doc.department ? ' · Dept: ' + doc.department : '');
     }
 
-    $('stat-today').textContent = stats.today_appointments;
-    $('stat-sched').textContent = stats.scheduled_appointments;
-    $('stat-seen').textContent = stats.total_patients_seen;
-    $('stat-rx').textContent = stats.total_prescriptions;
-    $('stat-rec').textContent = stats.total_records;
+    if ($('stat-today')) $('stat-today').textContent = stats.today_appointments != null ? stats.today_appointments : 0;
+    if ($('stat-sched')) $('stat-sched').textContent = stats.scheduled_appointments != null ? stats.scheduled_appointments : 0;
+    if ($('stat-seen')) $('stat-seen').textContent = stats.total_patients_seen != null ? stats.total_patients_seen : 0;
+    if ($('stat-rx')) $('stat-rx').textContent = stats.total_prescriptions != null ? stats.total_prescriptions : 0;
+    if ($('stat-rec')) $('stat-rec').textContent = stats.total_records != null ? stats.total_records : 0;
 
-    const today = data.todays_appointments || [];
-    $('todayBadge').textContent = today.length + ' patient' + (today.length !== 1 ? 's' : '');$('today-preview').innerHTML = today.length
-      ? today.map(a => `
-          <div class="schedule-item">
-            <span class="sched-time">${fmtTime(a.appointment_time)}</span>
-            <span class="sched-patient">${fmt(a.patient)}</span>
-            <span class="sched-reason">${fmt(a.reason_for_visit)}</span>
-            ${statusBadge(a.status)}
-          </div>`).join('')
-      : '<div class="empty-state"><span class="emoji">🎉</span>No appointments today!</div>';
+    const today = Array.isArray(data.todays_appointments) ? data.todays_appointments : [];
+    if ($('todayBadge')) $('todayBadge').textContent = today.length + ' patient' + (today.length !== 1 ? 's' : '');
+    if ($('today-preview')) {
+      $('today-preview').innerHTML = today.length
+        ? today.map(a => `
+            <div class="schedule-item">
+              <span class="sched-time">${fmtTime(a.appointment_time)}</span>
+              <span class="sched-patient">${renderPatientClickable(a.patient, false)}</span>
+              <span class="sched-reason">${fmt(a.reason_for_visit)}</span>
+              ${statusBadge(a.status)}
+            </div>`).join('')
+        : '<div class="empty-state"><span class="emoji">🎉</span>No appointments today!</div>';
+    }
 
-    $('today-tbody').innerHTML = today.length
-      ? today.map(a => `<tr>
-          <td><strong>${fmtTime(a.appointment_time)}</strong></td>
-          <td>${fmt(a.patient)}</td>
-          <td>${fmt(a.reason_for_visit)}</td>
-          <td>${statusBadge(a.status)}</td>
-          <td>${renderActionButtons(a)}</td>
-        </tr>`).join('')
-      : emptyRow(5, 'No appointments scheduled for today');
+    if ($('today-tbody')) {
+      $('today-tbody').innerHTML = today.length
+        ? today.map(a => `<tr>
+            <td><strong>${fmtTime(a.appointment_time)}</strong></td>
+            <td>${renderPatientClickable(a.patient, true)}</td>
+            <td>${fmt(a.reason_for_visit)}</td>
+            <td>${statusBadge(a.status)}</td>
+            <td>${renderActionButtons(a)}</td>
+          </tr>`).join('')
+        : emptyRow(5, 'No appointments scheduled for today');
+    }
 
-    const appts = data.appointments || [];
-    $('appt-count').textContent = appts.length;
-    $('appt-tbody').innerHTML = appts.length
-      ? appts.map(a => `<tr>
-          <td><strong>${fmt(a.patient)}</strong></td>
-          <td>${fmtDate(a.appointment_date)}</td>
-          <td>${fmtTime(a.appointment_time)}</td>
-          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${fmt(a.reason_for_visit)}</td>
-          <td>${statusBadge(a.status)}</td>
-          <td>${fmtCurr(a.consultation_fee)}</td>
-          <td>${fmt(a.phone_number)}</td>
-          <td>${renderActionButtons(a)}</td>
-        </tr>`).join('')
-      : emptyRow(8, 'No appointments found');
+    const appts = Array.isArray(data.appointments) ? data.appointments : [];
+    if ($('appt-count')) $('appt-count').textContent = appts.length;
+    if ($('appt-tbody')) {
+      $('appt-tbody').innerHTML = appts.length
+        ? appts.map(a => `<tr>
+            <td>${renderPatientClickable(a.patient, true)}</td>
+            <td>${fmtDate(a.appointment_date)}</td>
+            <td>${fmtTime(a.appointment_time)}</td>
+            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${fmt(a.reason_for_visit)}</td>
+            <td>${statusBadge(a.status)}</td>
+            <td>${fmtCurr(a.consultation_fee)}</td>
+            <td>${fmt(a.phone_number)}</td>
+            <td>${renderActionButtons(a)}</td>
+          </tr>`).join('')
+        : emptyRow(8, 'No appointments found');
+    }
 
-    $('overview-appts').innerHTML = appts.slice(0,6).length
-      ? appts.slice(0,6).map(a => `<tr>
-          <td><strong>${fmt(a.patient)}</strong></td>
-          <td>${fmtDate(a.appointment_date)}</td>
-          <td>${fmtTime(a.appointment_time)}</td>
-          <td>${fmt(a.reason_for_visit)}</td>
-          <td>${statusBadge(a.status)}</td>
-          <td>${fmtCurr(a.consultation_fee)}</td>
-        </tr>`).join('')
-      : emptyRow(6, 'No appointments yet');
+    if ($('overview-appts')) {
+      $('overview-appts').innerHTML = appts.slice(0, 6).length
+        ? appts.slice(0, 6).map(a => `<tr>
+            <td>${renderPatientClickable(a.patient, true)}</td>
+            <td>${fmtDate(a.appointment_date)}</td>
+            <td>${fmtTime(a.appointment_time)}</td>
+            <td>${fmt(a.reason_for_visit)}</td>
+            <td>${statusBadge(a.status)}</td>
+            <td>${fmtCurr(a.consultation_fee)}</td>
+          </tr>`).join('')
+        : emptyRow(6, 'No appointments yet');
+    }
 
-    const rxs = data.prescriptions || [];
-    $('rx-count').textContent = rxs.length;
-    $('rx-tbody').innerHTML = rxs.length
-      ? rxs.map(r => `<tr>
-          <td>${fmtDate(r.prescription_date)}</td>
-          <td><strong>${fmt(r.patient)}</strong></td>
-          <td>${fmt(r.medicine)}</td>
-          <td>${fmt(r.dosage)}</td>
-          <td>${fmt(r.frequency)}</td>
-          <td style="text-align:right">
-            <a href="/prescription_slip?name=${r.name}" target="_blank" class="btn-action" style="color:var(--blue); text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
-              🖨️ Print / PDF
-            </a>
-          </td>
-        </tr>`).join('')
-      : emptyRow(6, 'No prescriptions found');
+    const rxs = Array.isArray(data.prescriptions) ? data.prescriptions : [];
+    if ($('rx-count')) $('rx-count').textContent = rxs.length;
+    if ($('rx-tbody')) {
+      $('rx-tbody').innerHTML = rxs.length
+        ? rxs.map(r => {
+            const statusBadgeHtml = r.dispense_status === 'Dispensed'
+              ? `<span style="background:rgba(74,222,128,0.15); color:#4ade80; border:1px solid rgba(74,222,128,0.3); padding:3px 8px; border-radius:12px; font-size:11px; font-weight:600;">✓ Dispensed</span>`
+              : (r.dispense_status === 'Cancelled'
+                ? `<span style="background:rgba(248,113,113,0.15); color:#f87171; border:1px solid rgba(248,113,113,0.3); padding:3px 8px; border-radius:12px; font-size:11px; font-weight:600;">✕ Cancelled</span>`
+                : `<span style="background:rgba(251,191,36,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.3); padding:3px 8px; border-radius:12px; font-size:11px; font-weight:600;">⏳ Pending Dispense</span>`);
 
-    const recs = data.medical_records || [];
-    $('rec-count').textContent = recs.length;
-    $('rec-tbody').innerHTML = recs.length
-      ? recs.map(r => `<tr>
-          <td>${fmtDate(r.visit_date)}</td>
-          <td><strong>${fmt(r.patient)}</strong></td>
-          <td>${fmt(r.symptoms)}</td>
-          <td>${fmt(r.diagnosis)}</td>
-          <td>${fmt(r.treatment)}</td>
-        </tr>`).join('')
-      : emptyRow(5, 'No medical records found');
+            const invHtml = r.invoice_reference
+              ? `<span style="color:var(--blue); font-size:12px; font-weight:600;">🧾 ${escapeHtml(r.invoice_reference)}</span>`
+              : `<span style="color:var(--text-muted); font-size:12px;">Not Billed</span>`;
 
-    $('profileAvatar').textContent = initials;
-    $('profileName').textContent = doc.doctor_name || '—';
+            const medSummary = r.medicines_summary || (r.medicine ? `${r.medicine} (${r.dosage || ''})` : '—');
+
+            return `<tr>
+              <td>
+                <div style="font-weight:600; color:var(--text);">${escapeHtml(r.name)}</div>
+                <div style="font-size:11px; color:var(--text-dim);">${fmtDate(r.prescription_date)}</div>
+              </td>
+              <td>${renderPatientClickable(r.patient, true)}</td>
+              <td>
+                <div style="font-size:13px; color:var(--text); max-width:280px; line-height:1.4;">${escapeHtml(medSummary)}</div>
+              </td>
+              <td>${statusBadgeHtml}</td>
+              <td>${invHtml}</td>
+              <td style="text-align:right;">
+                <div style="display:flex; justify-content:flex-end; gap:6px; align-items:center;">
+                  <a href="/prescription_slip?name=${encodeURIComponent(r.name)}" target="_blank" class="btn-action" style="background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); text-decoration:none; padding:5px 10px; border-radius:6px; font-size:12px; display:inline-flex; align-items:center; gap:4px;" title="Print Official Prescription Slip">
+                    🖨️ Rx Slip
+                  </a>
+                  ${r.dispense_status === 'Pending' ? `
+                    <button class="btn-action" style="background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3); padding:5px 10px; border-radius:6px; font-size:12px;" onclick="dispenseRxDirectly('${escapeHtml(r.name)}')">
+                      💊 Dispense
+                    </button>
+                  ` : ''}
+                </div>
+              </td>
+            </tr>`;
+          }).join('')
+        : emptyRow(6, 'No prescriptions found');
+    }
+
+    const recs = Array.isArray(data.medical_records) ? data.medical_records : [];
+    window.cachedMedicalRecords = recs;
+    if (data.patients && Array.isArray(data.patients)) {
+      window.cachedPatientsList = data.patients;
+    }
+    if ($('rec-count')) $('rec-count').textContent = recs.length;
+    if ($('rec-tbody')) {
+      $('rec-tbody').innerHTML = recs.length
+        ? recs.map(r => `<tr>
+            <td>${fmtDate(r.visit_date)}</td>
+            <td>${renderPatientClickable(r.patient_name || r.patient, true)}</td>
+            <td>${fmt(r.symptoms)}</td>
+            <td>${fmt(r.diagnosis)}</td>
+            <td>${fmt(r.treatment)}</td>
+            <td style="text-align:right; white-space:nowrap;">
+              <button class="btn-action" style="padding:4px 9px; font-size:12px; border-radius:6px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; cursor:pointer;" onclick="viewMedicalRecordDetails('${escapeHtml(r.name)}')">
+                👁️ Details
+              </button>
+              <button class="btn-action" style="padding:4px 9px; font-size:12px; border-radius:6px; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.3); color:#38bdf8; cursor:pointer; margin-left:6px;" onclick="printMedicalRecordSummary('${escapeHtml(r.name)}')">
+                🖨️ Print
+              </button>
+            </td>
+          </tr>`).join('')
+        : emptyRow(6, 'No medical records found');
+    }
+
+    if ($('profileAvatar')) $('profileAvatar').textContent = initials;
+    if ($('profileName')) $('profileName').textContent = doc.doctor_name || '—';
     const meta = [];
     if (doc.specialization) meta.push({ color: '#6366f1', text: doc.specialization });
     if (doc.department) meta.push({ color: '#38bdf8', text: doc.department });
     if (doc.consultation_fee) meta.push({ color: '#4ade80', text: 'Rs.' + parseFloat(doc.consultation_fee).toLocaleString('en-IN') + '/visit' });
-    $('profileMeta').innerHTML = meta.map(m =>
-      `<span class="meta-chip"><span class="dot" style="background:${m.color}"></span>${m.text}</span>`
-    ).join('');
+    if ($('profileMeta')) {
+      $('profileMeta').innerHTML = meta.map(m =>
+        `<span class="meta-chip"><span class="dot" style="background:${m.color}"></span>${m.text}</span>`
+      ).join('');
+    }
 
-    $('profile-tbody').innerHTML = [
-      ['Full Name', doc.doctor_name],
-      ['Department', doc.department],
-      ['Specialization', doc.specialization],
-      ['Phone', doc.phone],
-      ['Email', doc.email],
-      ['Consultation Fee', doc.consultation_fee ? 'Rs.' + parseFloat(doc.consultation_fee).toLocaleString('en-IN') : null],
-      ['Status', doc.is_active ? 'Active' : 'Inactive'],
-    ].map(([label, val]) => `
-      <tr>
-        <td style="color:var(--text-dim);font-weight:500;width:200px;">${label}</td>
-        <td>${fmt(val)}</td>
-      </tr>
-    `).join('');
+    if ($('profile-tbody')) {
+      $('profile-tbody').innerHTML = [
+        ['Full Name', doc.doctor_name],
+        ['Department', doc.department],
+        ['Specialization', doc.specialization],
+        ['Phone', doc.phone],
+        ['Email', doc.email],
+        ['Consultation Fee', doc.consultation_fee ? 'Rs.' + parseFloat(doc.consultation_fee).toLocaleString('en-IN') : null],
+        ['Status', doc.is_active ? 'Active' : 'Inactive'],
+      ].map(([label, val]) => `
+        <tr>
+          <td style="color:var(--text-dim);font-weight:500;width:200px;">${label}</td>
+          <td>${fmt(val)}</td>
+        </tr>
+      `).join('');
+    }
 
-    $('loading').style.display = 'none';$('dashboard').style.display = 'block';
+    hideLoading();
   }
 
   function renderActionButtons(appt) {
@@ -1242,12 +3092,21 @@
       btns += `<button class="btn-action btn-complete" onclick="updateStatus('${appt.name}', 'Completed')">Complete</button>`;
     }
     btns += `<button class="btn-action" style="background:rgba(236,72,153,0.15); color:#f472b6; border:1px solid rgba(236,72,153,0.3);" onclick="openVitalsModal('${escapeHtml(appt.patient)}', '${escapeHtml(appt.name)}')" title="Record Vital Signs & Blood Glucose">💓 Vitals</button>`;
-    btns += `<button class="btn-action btn-prescribe" onclick="openRxModal('${escapeHtml(appt.patient)}', '${escapeHtml(appt.name)}')">+ Rx</button>`;
+    btns += `<button class="btn-action btn-prescribe" style="background:rgba(99,102,241,0.2); color:#a5b4fc; border:1px solid rgba(99,102,241,0.4);" onclick="openRxModal('${escapeHtml(appt.patient)}', '${escapeHtml(appt.name)}')" title="Write E-Prescription">💊 Write Rx</button>`;
     return btns;
   }
 
   async function updateStatus(appointmentId, newStatus) {
-    if (!confirm(`Mark appointment as ${newStatus}?`)) return;
+    const confirmed = await showCarePlusConfirm({
+      title: "Update Appointment Status",
+      message: `Mark appointment <strong>${escapeHtml(appointmentId)}</strong> as <strong>${escapeHtml(newStatus)}</strong>?`,
+      subtext: "The clinical records and patient schedule will reflect this change immediately.",
+      icon: "⏳",
+      confirmText: "Update Status",
+      cancelText: "Cancel",
+      type: "primary"
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch('/api/method/hospital_management.api.update_appointment_status', {
         method: 'POST',
@@ -1256,47 +3115,305 @@
       });
       const data = await res.json();
       if (data.message && data.message.status === 'success') {
+        showCarePlusToast(`Appointment marked as ${newStatus}`, "success", "Status Updated");
         loadDoctorDashboard();
       } else {
-        alert('Update failed: ' + (data.message || 'Error'));
+        showCarePlusToast('Update failed: ' + (data.message || 'Error'), "error");
       }
     } catch (err) {
       console.error(err);
-      alert('Network error while updating status.');
+      showCarePlusToast('Network error while updating status.', "error");
     }
   }
 
+  // ─────────────────────────────────────────────
+  // Dynamic E-Prescription Items & Studio Handlers
+  // ─────────────────────────────────────────────
+  let activeMedicinesList = [];
+
+  async function ensureMedicinesLoaded() {
+    if (activeMedicinesList && activeMedicinesList.length > 0) return activeMedicinesList;
+    try {
+      const res = await fetch('/api/method/hospital_management.api.get_medicines_stock_list');
+      if (res.ok) {
+        const d = await res.json();
+        if (d.message && Array.isArray(d.message) && d.message.length > 0) {
+          activeMedicinesList = d.message;
+          return activeMedicinesList;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch stock list:', e);
+    }
+
+    try {
+      const res2 = await fetch('/api/method/hospital_management.api.get_medicines_list');
+      if (res2.ok) {
+        const d2 = await res2.json();
+        activeMedicinesList = d2.message || [];
+      }
+    } catch (e) {
+      console.warn('Could not fetch medicines list:', e);
+    }
+    return activeMedicinesList;
+  }
+
+  function calculateUnitsForFrequency(freqStr, durationDays) {
+    const days = Math.max(1, parseInt(durationDays, 10) || 1);
+    const f = String(freqStr || '').toLowerCase().trim();
+    let dosesPerDay = 1;
+
+    if (f.includes('-')) {
+      const parts = f.split('-').map(p => parseInt(p.trim(), 10) || 0);
+      const sum = parts.reduce((a, b) => a + b, 0);
+      dosesPerDay = sum > 0 ? sum : 1;
+    } else if (f.includes('four') || f.includes('qid')) {
+      dosesPerDay = 4;
+    } else if (f.includes('thrice') || f.includes('three') || f.includes('tid')) {
+      dosesPerDay = 3;
+    } else if (f.includes('twice') || f.includes('two') || f.includes('bid')) {
+      dosesPerDay = 2;
+    } else if (f.includes('once') || f.includes('one') || f.includes('daily') || f.includes('od')) {
+      dosesPerDay = 1;
+    } else if (f.includes('needed') || f.includes('sos')) {
+      dosesPerDay = 1;
+    }
+
+    return Math.max(1, dosesPerDay * days);
+  }
+
+  function onRxFreqOrDurationChange(el) {
+    const row = el.closest('tr');
+    if (!row) return;
+    const freqVal = row.querySelector('.rx-freq-select') ? row.querySelector('.rx-freq-select').value : '1-0-1';
+    const durationVal = row.querySelector('.rx-duration-input') ? row.querySelector('.rx-duration-input').value : 5;
+    const qtyInput = row.querySelector('.rx-qty-input');
+    if (qtyInput) {
+      qtyInput.value = calculateUnitsForFrequency(freqVal, durationVal);
+    }
+    recalculateRxTotals();
+  }
+
+  function onRxMedicineChange(el) {
+    const row = el.closest('tr');
+    if (!row) return;
+    const hint = row.querySelector('.rx-stock-hint');
+    const opt = el.options[el.selectedIndex];
+    if (opt && opt.value) {
+      const avail = opt.getAttribute('data-stock') || opt.getAttribute('data-qty') || '—';
+      const price = parseFloat(opt.getAttribute('data-price') || 0);
+      if (hint) {
+        hint.innerHTML = `<span style="color:var(--emerald);">Stock: <strong>${escapeHtml(avail)}</strong></span> · <span style="color:var(--text-dim);">₹${price.toFixed(2)}/unit</span>`;
+      }
+    } else if (hint) {
+      hint.textContent = '';
+    }
+    recalculateRxTotals();
+  }
+
+  function recalculateRxTotals() {
+    const tbody = $('rxRowsTbody') || document.querySelector('#prescribed-medications-table tbody') || $('medication-rows-container');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr.rx-item-row');
+    const rowCount = rows.length;
+
+    let totalQty = 0;
+    let totalCost = 0.0;
+
+    rows.forEach(r => {
+      const medSelect = r.querySelector('.rx-med-select');
+      const qtyInput = r.querySelector('.rx-qty-input');
+      const qty = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+      totalQty += qty;
+
+      if (medSelect && medSelect.selectedIndex >= 0) {
+        const opt = medSelect.options[medSelect.selectedIndex];
+        const price = parseFloat(opt ? opt.getAttribute('data-price') : 0) || 0;
+        totalCost += (qty * price);
+      }
+    });
+
+    if ($('rxItemRowCount')) $('rxItemRowCount').textContent = rowCount;
+    if ($('rxSummaryCount')) $('rxSummaryCount').textContent = rowCount;
+    if ($('rxSummaryUnits')) $('rxSummaryUnits').textContent = `${totalQty} units`;
+    if ($('rxSummaryCost')) $('rxSummaryCost').textContent = `Rs. ${totalCost.toFixed(2)}`;
+  }
+
+  function removeRxMedicineRow(btn) {
+    const row = btn.closest('tr');
+    if (row) {
+      row.remove();
+      recalculateRxTotals();
+    }
+  }
+
+  async function addRxMedicineRow(initialData = null) {
+    const tbody = $('rxRowsTbody') || document.querySelector('#prescribed-medications-table tbody') || $('medication-rows-container');
+    if (!tbody) {
+      console.error('Target medication rows container not found in DOM (#rxRowsTbody).');
+      return;
+    }
+
+    const meds = await ensureMedicinesLoaded();
+    const medOptionsHtml = meds.map(m => {
+      const name = m.medicine_name || m.name;
+      const label = m.medicine_name ? `${m.medicine_name} (${m.name})` : m.name;
+      const price = m.price || 0;
+      const stock = m.quantity !== undefined ? m.quantity : '';
+      const selected = initialData && (initialData.medicine === m.name || initialData.medicine === m.medicine_name) ? 'selected' : '';
+      return `<option value="${escapeHtml(m.name)}" data-name="${escapeHtml(name)}" data-price="${price}" data-stock="${stock}" ${selected}>${escapeHtml(label)}</option>`;
+    }).join('');
+
+    const defaultDosage = (initialData && initialData.dosage) || '1 tablet';
+    const defaultFreq = (initialData && initialData.frequency) || '1-0-1';
+    const defaultDuration = (initialData && initialData.duration) || 5;
+    const defaultTiming = (initialData && initialData.timing) || 'After food';
+    const defaultUnits = (initialData && initialData.quantity) || calculateUnitsForFrequency(defaultFreq, defaultDuration);
+
+    const tr = document.createElement('tr');
+    tr.className = 'rx-item-row';
+    tr.style.borderBottom = '1px solid var(--border)';
+    tr.innerHTML = `
+      <td style="padding:6px 8px;">
+        <select class="rx-row-input rx-med-select" onchange="onRxMedicineChange(this)" required style="width:100%; padding:6px 8px; background:var(--surface3); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:12px;">
+          <option value="">-- Select Medicine --</option>
+          ${medOptionsHtml}
+        </select>
+        <div class="rx-stock-hint" style="font-size:10.5px; color:var(--text-dim); margin-top:3px;"></div>
+      </td>
+      <td style="padding:6px;">
+        <input type="text" class="rx-row-input rx-dosage-input" value="${escapeHtml(defaultDosage)}" placeholder="e.g. 500mg, 1 tablet" style="width:100%; padding:6px 8px; background:var(--surface3); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:12px;">
+      </td>
+      <td style="padding:6px;">
+        <select class="rx-row-input rx-freq-select" onchange="onRxFreqOrDurationChange(this)" style="width:100%; padding:6px 8px; background:var(--surface3); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:12px;">
+          <option value="1-0-1" ${defaultFreq === '1-0-1' ? 'selected' : ''}>1-0-1 (Twice Daily)</option>
+          <option value="1-0-0" ${defaultFreq === '1-0-0' ? 'selected' : ''}>1-0-0 (Once Daily Morning)</option>
+          <option value="0-0-1" ${defaultFreq === '0-0-1' ? 'selected' : ''}>0-0-1 (Once Daily Night)</option>
+          <option value="1-1-1" ${defaultFreq === '1-1-1' ? 'selected' : ''}>1-1-1 (Thrice Daily)</option>
+          <option value="1-1-0" ${defaultFreq === '1-1-0' ? 'selected' : ''}>1-1-0 (Twice Daily Morning/Noon)</option>
+          <option value="0-1-1" ${defaultFreq === '0-1-1' ? 'selected' : ''}>0-1-1 (Twice Daily Noon/Night)</option>
+          <option value="0-1-0" ${defaultFreq === '0-1-0' ? 'selected' : ''}>0-1-0 (Once Daily Noon)</option>
+          <option value="Four Times Daily" ${defaultFreq === 'Four Times Daily' ? 'selected' : ''}>Four Times Daily</option>
+          <option value="As Needed" ${defaultFreq === 'As Needed' ? 'selected' : ''}>As Needed (SOS)</option>
+        </select>
+      </td>
+      <td style="padding:6px;">
+        <input type="number" class="rx-row-input rx-duration-input" value="${defaultDuration}" min="1" max="90" oninput="onRxFreqOrDurationChange(this)" style="width:100%; padding:6px 8px; background:var(--surface3); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:12px; text-align:center;">
+      </td>
+      <td style="padding:6px;">
+        <select class="rx-row-input rx-timing-select" style="width:100%; padding:6px 8px; background:var(--surface3); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:12px;">
+          <option value="After food" ${defaultTiming === 'After food' ? 'selected' : ''}>After food</option>
+          <option value="Before food" ${defaultTiming === 'Before food' ? 'selected' : ''}>Before food</option>
+          <option value="With food" ${defaultTiming === 'With food' ? 'selected' : ''}>With food</option>
+          <option value="Empty stomach" ${defaultTiming === 'Empty stomach' ? 'selected' : ''}>Empty stomach</option>
+          <option value="At bedtime" ${defaultTiming === 'At bedtime' ? 'selected' : ''}>At bedtime</option>
+        </select>
+      </td>
+      <td style="padding:6px;">
+        <input type="number" class="rx-row-input rx-qty-input" value="${defaultUnits}" min="1" oninput="recalculateRxTotals()" style="width:100%; padding:6px 8px; background:var(--surface3); border:1px solid var(--border); border-radius:6px; color:var(--blue); font-weight:700; font-size:12px; text-align:center;">
+      </td>
+      <td style="padding:6px; text-align:center;">
+        <button type="button" class="btn-action" onclick="removeRxMedicineRow(this)" style="background:rgba(244,63,94,0.15); color:#f43f5e; border:1px solid rgba(244,63,94,0.3); padding:5px 8px; border-radius:6px; cursor:pointer;" title="Remove this medicine">
+          🗑️
+        </button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+
+    if (initialData && initialData.medicine) {
+      const select = tr.querySelector('.rx-med-select');
+      if (select) onRxMedicineChange(select);
+    }
+
+    recalculateRxTotals();
+  }
+
+  // Ensure functions are bound in global scope for HTML attributes & scripts
+  window.addRxMedicineRow = addRxMedicineRow;
+  window.addPrescriptionItemRow = addRxMedicineRow;
+  window.removeRxMedicineRow = removeRxMedicineRow;
+  window.recalculateRxTotals = recalculateRxTotals;
+
   function openRxModal(patientId, appointmentId) {
-    $('rxPatientId').value = patientId;
+    $('rxPatientId').value = patientId || '';
     $('rxAppointmentId').value = appointmentId || '';
-    $('rxModalPatient').textContent = 'Patient: ' + patientId;
+    $('rxModalPatient').textContent = 'Patient: ' + (patientId || 'General Consultation');
+    if ($('rxDiagnosisNotes')) $('rxDiagnosisNotes').value = '';
+
+    const tbody = $('rxRowsTbody') || document.querySelector('#prescribed-medications-table tbody') || $('medication-rows-container');
+    if (tbody) {
+      tbody.innerHTML = '';
+      addRxMedicineRow(); // Automatically append the first active medicine row
+    }
+
     $('rxModal').style.display = 'flex';
     loadRxVitalsPreview(patientId, appointmentId);
   }
 
   function closeRxModal() {
-    $('rxModal').style.display = 'none';$('rxForm').reset();
+    $('rxModal').style.display = 'none';
+    const tbody = $('rxRowsTbody') || document.querySelector('#prescribed-medications-table tbody') || $('medication-rows-container');
+    if (tbody) tbody.innerHTML = '';
+    recalculateRxTotals();
   }
 
   async function submitPrescription(e) {
     e.preventDefault();
     const btn = $('rxSubmitBtn');
     btn.disabled = true;
-    btn.textContent = 'Saving…';
+    btn.textContent = 'Transmitting E-Prescription…';
+
+    const tbody = $('rxRowsTbody') || document.querySelector('#prescribed-medications-table tbody') || $('medication-rows-container');
+    const rows = tbody ? tbody.querySelectorAll('tr.rx-item-row') : [];
+    if (!rows || rows.length === 0) {
+      showCarePlusToast('Please add at least one medicine to the prescription.', 'warning');
+      btn.disabled = false;
+      btn.textContent = '💊 Issue E-Prescription & Transmit';
+      return;
+    }
+
+    const items = [];
+    for (const r of rows) {
+      const medSelect = r.querySelector('.rx-med-select');
+      const medId = medSelect ? medSelect.value : '';
+      if (!medId) {
+        showCarePlusToast('Please select a medicine for all prescribed rows, or remove empty rows.', 'warning');
+        if (medSelect) medSelect.focus();
+        btn.disabled = false;
+        btn.textContent = '💊 Issue E-Prescription & Transmit';
+        return;
+      }
+      const opt = medSelect.options[medSelect.selectedIndex];
+      const medName = opt ? (opt.getAttribute('data-name') || opt.text) : medId;
+      const dosage = (r.querySelector('.rx-dosage-input') && r.querySelector('.rx-dosage-input').value.trim()) || '1 tablet';
+      const frequency = (r.querySelector('.rx-freq-select') && r.querySelector('.rx-freq-select').value) || '1-0-1';
+      const duration = (r.querySelector('.rx-duration-input') && r.querySelector('.rx-duration-input').value.trim()) || '5';
+      const timing = (r.querySelector('.rx-timing-select') && r.querySelector('.rx-timing-select').value) || 'After food';
+      const qty = parseFloat(r.querySelector('.rx-qty-input') && r.querySelector('.rx-qty-input').value) || 1;
+
+      items.push({
+        medicine: medId,
+        medicine_name: medName,
+        dosage: dosage,
+        frequency: frequency,
+        duration: duration.includes('day') ? duration : `${duration} days`,
+        timing: timing,
+        quantity: qty,
+        instructions: timing
+      });
+    }
 
     const payload = {
       patient: $('rxPatientId').value,
-      doctor: globalDoctorData.doctor.name,
-      appointment: $('rxAppointmentId').value,
-      medicine: $('rxMedicine').value,
-      dosage: $('rxDosage').value,
-      frequency: $('rxFrequency').value,
-      quantity: parseFloat($('rxQuantity').value) || 1,
-      instructions: $('rxInstructions').value
+      doctor: (globalDoctorData && globalDoctorData.doctor && globalDoctorData.doctor.name) || '',
+      appointment: $('rxAppointmentId').value || null,
+      diagnosis_notes: ($('rxDiagnosisNotes') && $('rxDiagnosisNotes').value.trim()) || '',
+      items: items
     };
 
     try {
-      const res = await fetch('/api/method/hospital_management.api.add_patient_prescription', {
+      const res = await fetch('/api/method/hospital_management.api.create_e_prescription', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1307,51 +3424,58 @@
       if (data.message && data.message.status === 'success') {
         closeRxModal();
         loadDoctorDashboard();
-        const rxDocName = (data.message.data && data.message.data.name) || '';
-        if (confirm('✅ Prescription recorded and added to billing!\n\nWould you like to view/print the official Medical Prescription slip now?')) {
-          window.open('/prescription_slip?name=' + rxDocName, '_blank');
+
+        const rxDoc = data.message.data || data.message.prescription || {};
+        const rxName = rxDoc.name || data.message.prescription_id || '';
+
+        const sModal = $('rxSuccessModal');
+        if (sModal) {
+          if ($('rxSuccessId')) $('rxSuccessId').textContent = rxName;
+          if ($('rxSuccessPrintBtn')) {
+            $('rxSuccessPrintBtn').onclick = () => window.open('/prescription_slip?name=' + encodeURIComponent(rxName), '_blank');
+          }
+          sModal.style.display = 'flex';
+        } else {
+          window.open('/prescription_slip?name=' + encodeURIComponent(rxName), '_blank');
         }
       } else {
-        alert('Failed to save prescription: ' + ((data.message && data.message.message) || 'Check input details.'));
+        showCarePlusToast('Failed to save prescription: ' + ((data.message && data.message.message) || 'Check input details.'), 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Error saving prescription.');
+      showCarePlusToast('Error saving prescription.', 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Save Prescription';
+      btn.textContent = '💊 Issue E-Prescription & Transmit';
     }
   }
 
   async function loadMedicinesDropdown() {
-    try {
-      const res = await fetch('/api/method/hospital_management.api.get_medicines_list');
-      const data = await res.json();
-      const list = data.message || [];
-      const select = $('rxMedicine');
-      select.innerHTML = '<option value="">-- Select Medicine --</option>';
-      
-      list.forEach(m => {
-        const displayName = m.medicine_name ? `${m.medicine_name} (${m.name})` : m.name;
-        select.innerHTML += `<option value="${m.name}">${displayName}</option>`;
-      });
-    } catch (err) {
-      console.error('Error fetching medicines:', err);
-    }
+    await ensureMedicinesLoaded();
   }
 
-  function switchTab(tab, btn) {
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn, .nav-item').forEach(b => b.classList.remove('active'));
-    document.getElementById('panel-' + tab).classList.add('active');
-    if (btn) btn.classList.add('active');
-    if (tab === 'billing' && globalDoctorData) {
-      loadDoctorBilling(globalDoctorData.doctor);
-    }
-    if (tab === 'vitals') {
-      loadVitalsTimeline();
-    }
+  // ─────────────────────────────────────────────
+  // Pharmacy Desk queue removed from Doctor Dashboard
+  function loadPharmacyDeskQueue() {}
+  function renderPharmacyDeskQueue() {}
+  function filterPharmacyQueue() {}
+  function handlePharmacySearch() {}
+  function dispensePrescription() {}
+  function dispenseRxDirectly() {}
+  function loadMedicinesStockList() { return []; }
+
+  function openGenericRxModal() {
+    const pat = prompt('Enter Patient ID or Name:');
+    if (!pat) return;
+    openRxModal(pat.trim(), '');
   }
+
+  function closeRxSuccessModal() {
+    const m = $('rxSuccessModal');
+    if (m) m.style.display = 'none';
+  }
+
+  // (switchTab defined at top of script with window binding)
 
   // ─────────────────────────────────────────────
   // Vitals & Blood Sugar Management Handlers
@@ -1521,18 +3645,18 @@
       });
       const data = await res.json();
       if (data.message && data.message.status === 'success') {
-        alert('✅ Vitals recorded successfully! Doc: ' + data.message.vitals.name);
+        showCarePlusToast('Vitals recorded successfully! Doc: ' + data.message.vitals.name, 'success', 'Vitals Saved');
         closeVitalsModal();
         if ($('rxModal').style.display === 'flex') {
           loadRxVitalsPreview(payload.patient, payload.appointment);
         }
         loadVitalsTimeline();
       } else {
-        alert('Failed to record vitals: ' + ((data.message && data.message.message) || 'Error'));
+        showCarePlusToast('Failed to record vitals: ' + ((data.message && data.message.message) || 'Error'), 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Network error while saving vitals.');
+      showCarePlusToast('Network error while saving vitals.', 'error');
     } finally {
       btn.disabled = false;
       btn.textContent = '💾 Save Vitals Record';
@@ -1600,41 +3724,78 @@
   }
 
   async function loadVitalsTimeline() {
-    const tbody = $('vitals-timeline-tbody');
+    const table = $('vitals-timeline-table');
+    const tbody = $('vitals-timeline-tbody') || (table && table.querySelector('tbody'));
     if (!tbody) return;
 
     try {
       const res = await fetch('/api/method/hospital_management.api.get_patient_vitals_history');
       const data = await res.json();
-      const list = (data.message && data.message.vitals) || [];
+      const list = (data.message && data.message.vitals) || (Array.isArray(data.message) ? data.message : []);
 
-      if (list.length === 0) {
+      if (!list || list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-dim);">No patient vitals recorded yet. Use "+ Record Patient Vitals" above or the 💓 button in appointments.</td></tr>';
         return;
       }
 
       tbody.innerHTML = list.map(v => {
-        const bp = (v.bp_systolic && v.bp_diastolic) ? `${v.bp_systolic}/${v.bp_diastolic}` : '—';
-        const sugars = [];
-        if (v.blood_sugar_fasting) sugars.push(`FBS:${v.blood_sugar_fasting}`);
-        if (v.blood_sugar_postprandial) sugars.push(`PPBS:${v.blood_sugar_postprandial}`);
-        if (v.blood_sugar_random) sugars.push(`RBS:${v.blood_sugar_random}`);
-        const sugarStr = sugars.length > 0 ? sugars.join(' | ') : '—';
+        const dateVal = v.recorded_at || v.recorded_date_time || v.creation;
+        const formattedDate = dateVal ? new Date(dateVal).toLocaleDateString('en-IN', {
+          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : '—';
 
+        const patientId = v.patient || '';
+        const patientName = v.patient_name || v.patient || 'Unknown';
+        const patientClickable = `<strong class="patient-timeline-trigger" onclick="openPatientTimeline('${escapeHtml(patientId)}')" title="Click to view Patient Medical History Timeline" style="cursor:pointer; color:var(--blue, #38bdf8); text-decoration:underline;">${escapeHtml(patientName)}</strong>`;
+
+        const bp = v.bp || ((v.bp_systolic && v.bp_diastolic) ? `${v.bp_systolic}/${v.bp_diastolic}` : '—');
+
+        let pulseStr = '—';
+        if (v.pulse !== undefined && v.pulse !== null && v.pulse !== '—') {
+          pulseStr = String(v.pulse).includes('bpm') ? v.pulse : `${v.pulse} bpm`;
+        } else if (v.pulse_rate) {
+          pulseStr = `${v.pulse_rate} bpm`;
+        }
+
+        let tempStr = '—';
+        if (v.temp !== undefined && v.temp !== null && v.temp !== '—') {
+          tempStr = String(v.temp).includes('°F') ? v.temp : `${v.temp} °F`;
+        } else if (v.temperature) {
+          tempStr = `${v.temperature} °F`;
+        }
+
+        const bmiVal = v.bmi || '—';
+        const bmiStatus = v.bmi_status || 'Normal';
+        const bmiHtml = bmiVal !== '—' 
+          ? `<strong>${bmiVal}</strong> <span style="font-size:11px; color:var(--text-dim);">(${escapeHtml(bmiStatus)})</span>` 
+          : '—';
+
+        let sugarStr = '—';
+        if (v.blood_sugar && v.blood_sugar !== '—') {
+          sugarStr = escapeHtml(v.blood_sugar);
+        } else {
+          const sugars = [];
+          if (v.blood_sugar_fasting) sugars.push(`FBS:${v.blood_sugar_fasting}`);
+          if (v.blood_sugar_postprandial) sugars.push(`PPBS:${v.blood_sugar_postprandial}`);
+          if (v.blood_sugar_random) sugars.push(`RBS:${v.blood_sugar_random}`);
+          sugarStr = sugars.length > 0 ? sugars.join(' | ') : '—';
+        }
+
+        const sugarStatus = v.sugar_status || v.sugar_remarks || '';
         let sugarBadge = '—';
-        if (v.sugar_remarks) {
-          const sCol = v.sugar_remarks === 'High / Diabetic' ? '#f43f5e' : (v.sugar_remarks === 'Pre-diabetic' ? '#fbbf24' : '#4ade80');
-          const sBg = v.sugar_remarks === 'High / Diabetic' ? 'rgba(244,63,94,0.15)' : (v.sugar_remarks === 'Pre-diabetic' ? 'rgba(251,191,36,0.15)' : 'rgba(74,222,128,0.15)');
-          sugarBadge = `<span style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px; background:${sBg}; color:${sCol};">${v.sugar_remarks}</span>`;
+        if (sugarStatus && sugarStatus !== '—') {
+          const sCol = sugarStatus === 'High / Diabetic' ? '#f43f5e' : (sugarStatus === 'Pre-diabetic' ? '#fbbf24' : '#4ade80');
+          const sBg = sugarStatus === 'High / Diabetic' ? 'rgba(244,63,94,0.15)' : (sugarStatus === 'Pre-diabetic' ? 'rgba(251,191,36,0.15)' : 'rgba(74,222,128,0.15)');
+          sugarBadge = `<span style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px; background:${sBg}; color:${sCol};">${escapeHtml(sugarStatus)}</span>`;
         }
 
         return `<tr>
-          <td>${v.recorded_date_time ? new Date(v.recorded_date_time).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '—'}</td>
-          <td><strong>${escapeHtml(v.patient)}</strong></td>
-          <td>${bp}</td>
-          <td>${v.pulse_rate ? v.pulse_rate + ' bpm' : '—'}</td>
-          <td>${v.temperature ? v.temperature + ' °F' : '—'}</td>
-          <td>${v.bmi ? `<strong>${v.bmi}</strong> <span style="font-size:11px; color:var(--text-dim);">(${v.bmi_status})</span>` : '—'}</td>
+          <td>${formattedDate}</td>
+          <td>${patientClickable}</td>
+          <td>${escapeHtml(bp)}</td>
+          <td>${escapeHtml(pulseStr)}</td>
+          <td>${escapeHtml(tempStr)}</td>
+          <td>${bmiHtml}</td>
           <td style="color:#f472b6; font-weight:500;">${sugarStr}</td>
           <td>${sugarBadge}</td>
           <td>
@@ -1643,220 +3804,717 @@
         </tr>`;
       }).join('');
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load vitals timeline:', err);
       tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--rose);">Failed to load vitals timeline.</td></tr>';
     }
   }
 
   // ─────────────────────────────────────────────
-  // Consultation Invoices & Billing Function
-  // ─────────────────────────────────────────────
-  async function loadDoctorBilling(doctor) {
-    const tbody = $('doctor-billing-tbody');
-    if (!tbody) return;
+  // Billing functions removed from Doctor Dashboard
+  function loadDoctorBilling() {}
+  function renderDoctorBilling() {}
+  function viewDoctorInvoiceSlip() {}
+  function closeDoctorSlipModal() {}
 
-    try {
-      const docObj = doctor || (globalDoctorData && globalDoctorData.doctor);
-      const docIdentifier = (docObj && (docObj.name || docObj.doctor_name || docObj.email)) || '';
-      let url = '/api/method/hospital_management.api.get_invoices';
-      if (docIdentifier) {
-        url += `?doctor=${encodeURIComponent(docIdentifier)}`;
-      }
-
-      const res = await fetch(url);
-      const data = await res.json();
-
-      let invoices = [];
-      if (data.message && data.message.status === 'success') {
-        invoices = data.message.invoices || [];
-      } else if (data.message && Array.isArray(data.message)) {
-        invoices = data.message;
-      } else if (globalDoctorData && globalDoctorData.invoices) {
-        invoices = globalDoctorData.invoices;
-      } else {
-        console.error('Failed to load doctor billing records:', data);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--rose);">⚠️ Error loading billing records.</td></tr>';
-        return;
-      }
-
-      // Match the logged-in doctor's identity against the billing records
-      if (docObj) {
-        const docNames = [docObj.name, docObj.doctor_name, docObj.email].filter(Boolean).map(s => String(s).toLowerCase().trim());
-        invoices = invoices.filter(inv => {
-          if (!inv.doctor && !inv.doctor_name) return true;
-          const invDoc = String(inv.doctor || '').toLowerCase().trim();
-          const invDocName = String(inv.doctor_name || '').toLowerCase().trim();
-          return docNames.some(d => d === invDoc || d === invDocName || invDoc.includes(d) || invDocName.includes(d));
-        });
-      }
-
-      renderDoctorBilling(invoices);
-    } catch (err) {
-      console.error('Error fetching doctor billing invoices:', err);
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--rose);">⚠️ Failed to connect to billing server.</td></tr>';
-    }
-  }
-
-  function renderDoctorBilling(invoices) {
-    const tbody = $('doctor-billing-tbody');
-    if (!tbody) return;
-
-    const list = invoices || [];
-    // Calculate the KPI cards ("TOTAL INVOICED" and "TOTAL INVOICES")
-    const totalInvoiced = list.reduce((sum, inv) => sum + Number(inv.grand_total || inv.total_amount || 0), 0);
-    const totalCount = list.length;
-
-    if ($('doctorBilledTotal')) {
-      $('doctorBilledTotal').textContent = '₹' + totalInvoiced.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-    if ($('doctorInvoicesCount')) {
-      $('doctorInvoicesCount').textContent = totalCount;
-    }
-
-    // When the API response arrives, clear/hide the "Loading billing records..." placeholder
-    // If empty: show "No billing records found."
-    if (list.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--text-dim);">No billing records found.</td></tr>';
-      return;
-    }
-
-    // Populate table rows
-    tbody.innerHTML = list.map(inv => {
-      const grand = Number(inv.grand_total || inv.total_amount || 0);
-      const status = inv.payment_status || 'Unpaid';
-      return `<tr>
-        <td><strong>${escapeHtml(inv.name)}</strong></td>
-        <td>${fmtDate(inv.invoice_date)}</td>
-        <td>${escapeHtml(inv.patient_name || inv.patient || '—')}</td>
-        <td><strong>₹${grand.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
-        <td>${statusBadge(status)}</td>
-        <td>
-          <button class="btn-action" onclick="viewDoctorInvoiceSlip('${escapeHtml(inv.name)}')" title="View Invoice Slip">📄 Slip</button>
-        </td>
-      </tr>`;
-    }).join('');
-  }
-
-  async function viewDoctorInvoiceSlip(invoiceId) {
-    const modal = $('doctorSlipModal');
-    const container = $('doctorSlipContent');
-    const title = $('doctorSlipId');
-    if (title) title.textContent = invoiceId;
-    container.innerHTML = '<div style="text-align:center; padding:24px; color:var(--text-dim);">Loading invoice slip details...</div>';
-    modal.style.display = 'flex';
-
-    try {
-      const res = await fetch(`/api/method/hospital_management.api.get_invoice_details?invoice_id=${encodeURIComponent(invoiceId)}`);
-      const data = await res.json();
-      if (data.message && data.message.status === 'success') {
-        const inv = data.message.invoice;
-        const pat = inv.patient_details || {};
-        const doc = inv.doctor_details || {};
-        const items = inv.items || [];
-        const grand = Number(inv.grand_total || inv.total_amount || 0);
-        const paid = Number(inv.paid_amount || 0);
-        const outstanding = Number(inv.outstanding_amount !== undefined ? inv.outstanding_amount : Math.max(0, grand - paid));
-
-        container.innerHTML = `
-          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:16px;">
-            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;">
-              <div>
-                <div style="font-size:12px; color:var(--text-dim); text-transform:uppercase;">Patient</div>
-                <div style="font-weight:700; font-size:15px; color:var(--text);">${escapeHtml(pat.patient_name || inv.patient_name || inv.patient)}</div>
-                <div style="font-size:12px; color:var(--text-dim);">${escapeHtml(pat.phone || '')}</div>
-              </div>
-              <div>
-                <div style="font-size:12px; color:var(--text-dim); text-transform:uppercase;">Invoice Details</div>
-                <div style="font-weight:600; color:var(--text);">${escapeHtml(inv.name)} · ${inv.invoice_date || '—'}</div>
-                <div>Status: ${statusBadge(inv.payment_status || 'Unpaid')}</div>
-              </div>
-            </div>
-          </div>
-
-          <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:16px;">
-            <thead>
-              <tr style="border-bottom:1px solid var(--border); color:var(--text-dim); text-align:left;">
-                <th style="padding:8px 4px;">Service / Item</th>
-                <th style="padding:8px 4px; text-align:center;">Qty</th>
-                <th style="padding:8px 4px; text-align:right;">Rate</th>
-                <th style="padding:8px 4px; text-align:right;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${items.length > 0 ? items.map(it => `
-                <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:8px 4px;">${escapeHtml(it.item_name || 'Medical Service')}</td>
-                  <td style="padding:8px 4px; text-align:center;">${it.quantity || 1}</td>
-                  <td style="padding:8px 4px; text-align:right;">₹${Number(it.unit_price || 0).toFixed(2)}</td>
-                  <td style="padding:8px 4px; text-align:right;">₹${Number(it.amount || 0).toFixed(2)}</td>
-                </tr>
-              `).join('') : `
-                <tr style="border-bottom:1px solid var(--border);">
-                  <td colspan="4" style="padding:8px 4px; text-align:center; color:var(--text-dim);">Consultation / Service Charges</td>
-                </tr>
-              `}
-            </tbody>
-          </table>
-
-          <div style="display:flex; justify-content:flex-end; font-size:13px;">
-            <div style="width:220px; line-height:1.8;">
-              <div style="display:flex; justify-content:space-between; color:var(--text-dim);">
-                <span>Subtotal:</span>
-                <span>₹${Number(inv.subtotal || grand).toFixed(2)}</span>
-              </div>
-              <div style="display:flex; justify-content:space-between; font-weight:700; color:var(--text); font-size:15px; border-top:1px solid var(--border); padding-top:4px;">
-                <span>Grand Total:</span>
-                <span>₹${grand.toFixed(2)}</span>
-              </div>
-              <div style="display:flex; justify-content:space-between; color:var(--green);">
-                <span>Paid Amount:</span>
-                <span>₹${paid.toFixed(2)}</span>
-              </div>
-              ${outstanding > 0 ? `
-                <div style="display:flex; justify-content:space-between; color:var(--rose); font-weight:600;">
-                  <span>Balance Due:</span>
-                  <span>₹${outstanding.toFixed(2)}</span>
-                </div>
-              ` : ''}
-            </div>
-          </div>
-        `;
-      } else {
-        container.innerHTML = '<div style="text-align:center; padding:24px; color:var(--rose);">Could not load invoice details.</div>';
-      }
-    } catch (err) {
-      console.error('Error fetching slip:', err);
-      container.innerHTML = '<div style="text-align:center; padding:24px; color:var(--rose);">Server error loading invoice slip.</div>';
-    }
-  }
-
-  function closeDoctorSlipModal() {
-    $('doctorSlipModal').style.display = 'none';
-  }
 
   function escapeHtml(str) {
     if (!str) return '';
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  function confirmAndLogout() {
-    if (confirm("Are you sure you want to log out?")) {
-      doLogout();
-    }
-  }
-
-  async function doLogout() {
-    try {
-      await fetch('/api/method/hospital_management.api.logout', { method: 'POST' });
-    } catch (err) {
-      console.error(err);
-    }
-    window.location.replace('/frontend');
-  }
+// (confirmAndLogout & doLogout defined at top of script)
 
   loadMedicinesDropdown();
   loadDoctorDashboard();
+
+  // ==========================================================================
+  // PATIENT MEDICAL HISTORY TIMELINE CONTROLLER
+  // ==========================================================================
+  async function openPatientTimeline(patientId) {
+    if (!patientId) return;
+
+    const backdrop = $('timelineDrawerBackdrop');
+    const drawer = $('patientTimelineDrawer');
+    if (!backdrop || !drawer) return;
+
+    // Open drawer immediately and show loading
+    backdrop.classList.add('active');
+    drawer.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    // Reset header
+    $('timelineAvatar').textContent = '…';
+    $('timelinePatientName').textContent = patientId;
+    $('timelinePatientId').textContent = 'Loading…';
+    $('timelinePatientMeta').innerHTML = '<span>Retrieving clinical record…</span>';
+    $('metricTotalVisits').textContent = '—';
+    $('metricPrescriptions').textContent = '—';
+    $('metricVitals').textContent = '—';
+    $('metricLastSeen').textContent = '—';
+
+    // Filter pills reset
+    document.querySelectorAll('.timeline-pill').forEach((p, idx) => {
+      p.classList.toggle('active', idx === 0);
+    });
+    currentTimelineFilter = 'all';
+
+    // Show loading state in body
+    $('timelineLoadingBox').style.display = 'flex';
+    $('timelineStream').style.display = 'none';
+    $('timelineEmptyState').style.display = 'none';
+
+    try {
+      const resp = await fetch(`/api/method/hospital_management.api.get_patient_medical_timeline?patient=${encodeURIComponent(patientId)}`);
+      const res = await resp.json();
+
+      if (!res.message || res.message.status !== 'success') {
+        throw new Error(res.message ? res.message.message : 'Failed to retrieve timeline');
+      }
+
+      const data = res.message;
+      const pat = data.patient || {};
+      const summary = data.summary || {};
+      activeTimelineEvents = data.events || [];
+
+      // Render Header
+      const displayName = pat.patient_name || pat.name || patientId;
+      const initials = displayName.split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('').toUpperCase() || 'P';
+      $('timelineAvatar').textContent = initials;
+      $('timelinePatientName').textContent = displayName;
+      $('timelinePatientId').textContent = pat.name || patientId;
+
+      // Meta tags
+      const metaItems = [];
+      if (pat.gender && pat.gender !== '—') metaItems.push(`<span class="timeline-sub-badge">${escapeHtml(pat.gender)}</span>`);
+      if (pat.blood_group && pat.blood_group !== '—') metaItems.push(`<span class="timeline-sub-badge" style="color:var(--rose); font-weight:700;">${escapeHtml(pat.blood_group)}</span>`);
+      if (pat.phone && pat.phone !== '—') metaItems.push(`<span>📞 ${escapeHtml(pat.phone)}</span>`);
+      if (pat.email && pat.email !== '—') metaItems.push(`<span>✉️ ${escapeHtml(pat.email)}</span>`);
+      if (pat.creation) metaItems.push(`<span>Member since: ${fmtDate(pat.creation)}</span>`);
+      $('timelinePatientMeta').innerHTML = metaItems.length ? metaItems.join('') : '<span>CarePlus Patient</span>';
+
+      // Summary metrics
+      $('metricTotalVisits').textContent = summary.total_appointments || 0;
+      $('metricPrescriptions').textContent = summary.total_prescriptions || 0;
+      $('metricVitals').textContent = summary.total_vitals_records || 0;
+      $('metricLastSeen').textContent = summary.last_seen_date && summary.last_seen_date !== '—' ? fmtDate(summary.last_seen_date) : '—';
+
+      // Counts in filter pills
+      $('countAll').textContent = activeTimelineEvents.length;
+      $('countAppts').textContent = summary.total_appointments || 0;
+      $('countRxs').textContent = summary.total_prescriptions || 0;
+      $('countRecs').textContent = summary.total_medical_records || 0;
+      $('countVitals').textContent = summary.total_vitals_records || 0;
+
+      // Render Events
+      $('timelineLoadingBox').style.display = 'none';
+      renderTimelineEvents(activeTimelineEvents);
+
+    } catch (err) {
+      console.error("Error loading patient timeline:", err);
+      $('timelineLoadingBox').style.display = 'none';
+      $('timelineStream').style.display = 'none';
+      $('timelineEmptyState').style.display = 'block';
+      $('timelineEmptyState').innerHTML = `
+        <div class="timeline-empty-icon" style="color:var(--rose);">⚠️</div>
+        <div class="timeline-empty-title">Error Loading Timeline</div>
+        <div class="timeline-empty-desc">${escapeHtml(err.message || 'An unexpected error occurred while fetching timeline data.')}</div>
+        <button class="btn-action" style="margin-top:16px; padding:6px 16px; font-weight:600;" onclick="openPatientTimeline('${encodeURIComponent(patientId)}')">Retry</button>
+      `;
+    }
+  }
+
+  function closePatientTimeline() {
+    const backdrop = $('timelineDrawerBackdrop');
+    const drawer = $('patientTimelineDrawer');
+    if (backdrop) backdrop.classList.remove('active');
+    if (drawer) drawer.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  function filterTimeline(type, el) {
+    currentTimelineFilter = type;
+    document.querySelectorAll('.timeline-pill').forEach(p => p.classList.remove('active'));
+    if (el) el.classList.add('active');
+
+    let filtered = activeTimelineEvents;
+    if (type !== 'all') {
+      filtered = activeTimelineEvents.filter(ev => ev.type === type);
+    }
+    renderTimelineEvents(filtered);
+  }
+
+  function renderTimelineEvents(events) {
+    const stream = $('timelineStream');
+    const empty = $('timelineEmptyState');
+    if (!stream || !empty) return;
+
+    if (!events || events.length === 0) {
+      stream.style.display = 'none';
+      empty.style.display = 'block';
+      return;
+    }
+
+    empty.style.display = 'none';
+    stream.style.display = 'block';
+
+    stream.innerHTML = events.map(ev => {
+      const typeCls = 'node-' + (ev.type || 'appointment');
+      const badgeCls = ev.badge_color || 'blue';
+      const formattedDate = ev.date ? fmtDate(ev.date) : '—';
+      const timeStr = ev.time ? ` · ${ev.time}` : '';
+      
+      // Type label
+      let typeLabel = 'Event';
+      if (ev.type === 'appointment') typeLabel = 'Clinical Consultation';
+      else if (ev.type === 'prescription') typeLabel = 'Prescription';
+      else if (ev.type === 'medical_record') typeLabel = 'Diagnostic Record';
+      else if (ev.type === 'vitals') typeLabel = 'Clinical Vitals';
+
+      // Build Details Grid
+      let detailsHtml = '';
+      if (ev.details && typeof ev.details === 'object') {
+        const entries = Object.entries(ev.details);
+        if (entries.length > 0) {
+          detailsHtml = `<div class="timeline-details-grid">` + entries.map(([k, v]) => {
+            const isFull = (v && String(v).length > 35) || k.toLowerCase().includes('instruction') || k.toLowerCase().includes('treatment') || k.toLowerCase().includes('notes') || k.toLowerCase().includes('reason');
+            return `
+              <div class="timeline-detail-col ${isFull ? 'full-span' : ''}">
+                <span class="timeline-detail-lbl">${escapeHtml(k)}</span>
+                <span class="timeline-detail-val">${escapeHtml(String(v || '—'))}</span>
+              </div>
+            `;
+          }).join('') + `</div>`;
+        }
+      }
+
+      // Action shortcut for prescription
+      let actionLink = '';
+      if (ev.type === 'prescription' && ev.id) {
+        actionLink = `
+          <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+            <a href="/prescription_slip?name=${encodeURIComponent(ev.id)}" target="_blank" class="btn-action" style="font-size:11px; padding:4px 10px; text-decoration:none; color:var(--blue); display:inline-flex; align-items:center; gap:4px; border:1px solid rgba(56,189,248,0.3); border-radius:6px;">
+              🖨️ View / Print Rx Slip
+            </a>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="timeline-event-item">
+          <div class="timeline-node-icon ${typeCls}" title="${escapeHtml(typeLabel)}">
+            ${ev.icon || '📌'}
+          </div>
+          <div class="timeline-card">
+            <div class="timeline-card-meta">
+              <span class="timeline-card-date">
+                📅 ${formattedDate}${timeStr}
+              </span>
+              <span class="timeline-badge ${badgeCls}">${escapeHtml(typeLabel)}</span>
+            </div>
+            <div class="timeline-card-title">${escapeHtml(ev.title || 'Clinical Entry')}</div>
+            <div class="timeline-card-sub">${escapeHtml(ev.subtitle || '')}</div>
+            ${detailsHtml}
+            ${actionLink}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Keyboard shortcut: Escape to close drawer
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+      const drawer = $('patientTimelineDrawer');
+      if (drawer && drawer.classList.contains('active')) {
+        closePatientTimeline();
+      }
+      const addMedModal = $('addMedicalRecordModal');
+      if (addMedModal && addMedModal.style.display !== 'none') {
+        closeAddMedicalRecordModal();
+      }
+      const viewMedModal = $('viewMedicalRecordModal');
+      if (viewMedModal && viewMedModal.style.display !== 'none') {
+        closeViewMedicalRecordModal();
+      }
+    }
+  });
+
+  // ==========================================
+  // MEDICAL RECORD MODAL & ACTIONS
+  // ==========================================
+  let allMedicalRecordPatientOptions = [];
+
+  function populatePatientDropdown(filter = '') {
+    const select = $('medRecPatientSelect');
+    if (!select) return;
+
+    const term = (filter || '').toLowerCase().trim();
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">— Select Patient —</option>';
+
+    const filteredAppts = [];
+    const filteredRegistered = [];
+
+    allMedicalRecordPatientOptions.forEach(p => {
+      const match = !term || p.name.toLowerCase().includes(term) || p.id.toLowerCase().includes(term);
+      if (match) {
+        if (p.isAppt) {
+          filteredAppts.push(p);
+        } else {
+          filteredRegistered.push(p);
+        }
+      }
+    });
+
+    if (filteredAppts.length > 0) {
+      const grp = document.createElement('optgroup');
+      grp.label = "Doctor's Appointment Patients";
+      filteredAppts.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.name} (${p.id})`;
+        if (p.id === currentVal) opt.selected = true;
+        grp.appendChild(opt);
+      });
+      select.appendChild(grp);
+    }
+
+    if (filteredRegistered.length > 0) {
+      const grp = document.createElement('optgroup');
+      grp.label = "All Registered Patients";
+      filteredRegistered.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.name} (${p.id})`;
+        if (p.id === currentVal) opt.selected = true;
+        grp.appendChild(opt);
+      });
+      select.appendChild(grp);
+    }
+
+    if (filteredAppts.length === 0 && filteredRegistered.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No matching patients found';
+      opt.disabled = true;
+      select.appendChild(opt);
+    }
+  }
+
+  function filterMedicalRecordPatients(query) {
+    populatePatientDropdown(query);
+  }
+
+  function onMedicalRecordPatientSelected(patientId) {
+    if ($('recordPatient')) $('recordPatient').value = patientId || '';
+    const badge = $('selectedPatientBadge');
+    if (badge) {
+      if (patientId) {
+        badge.style.display = 'inline-block';
+        const match = allMedicalRecordPatientOptions.find(p => p.id === patientId);
+        if (match) {
+          badge.textContent = `✓ ${match.name}`;
+        } else {
+          badge.textContent = '✓ Selected';
+        }
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  }
+
+  function openAddMedicalRecordModal() {
+    const modal = $('addMedicalRecordModal');
+    if (!modal) return;
+
+    // Set Visit Date default to today (YYYY-MM-DD)
+    const todayStr = new Date().toISOString().split('T')[0];
+    if ($('medRecVisitDate')) $('medRecVisitDate').value = todayStr;
+
+    // Reset filter, badge, and hidden fields
+    if ($('patientSearchFilter')) $('patientSearchFilter').value = '';
+    if ($('selectedPatientBadge')) $('selectedPatientBadge').style.display = 'none';
+    if ($('recordPatient')) $('recordPatient').value = '';
+
+    // Collect all patients
+    const seen = new Set();
+    allMedicalRecordPatientOptions = [];
+
+    // 1. Doctor's active/recent appointment patients first
+    if (globalDoctorData && Array.isArray(globalDoctorData.appointments)) {
+      globalDoctorData.appointments.forEach(a => {
+        if (a.patient && !seen.has(a.patient)) {
+          seen.add(a.patient);
+          allMedicalRecordPatientOptions.push({
+            id: a.patient,
+            name: a.patient_name || a.patient,
+            isAppt: true
+          });
+        }
+      });
+    }
+
+    // 2. All registered patients
+    const sourceList = window.cachedPatientsList || [];
+    sourceList.forEach(p => {
+      const pid = p.name;
+      if (!seen.has(pid)) {
+        seen.add(pid);
+        allMedicalRecordPatientOptions.push({
+          id: pid,
+          name: p.patient_name || pid,
+          isAppt: false
+        });
+      }
+    });
+
+    // Populate dropdown
+    populatePatientDropdown('');
+
+    // Reset textareas
+    if ($('medRecSymptoms')) $('medRecSymptoms').value = '';
+    if ($('medRecDiagnosis')) $('medRecDiagnosis').value = '';
+    if ($('medRecTreatment')) $('medRecTreatment').value = '';
+
+    modal.style.display = 'flex';
+  }
+
+  function closeAddMedicalRecordModal() {
+    const modal = $('addMedicalRecordModal');
+    if (modal) modal.style.display = 'none';
+    if ($('addMedicalRecordForm')) $('addMedicalRecordForm').reset();
+    if ($('selectedPatientBadge')) $('selectedPatientBadge').style.display = 'none';
+  }
+
+  async function handleCreateMedicalRecordSubmit(event) {
+    if (event) event.preventDefault();
+
+    const patientSelect = $('medRecPatientSelect') || $('recordPatient');
+    const patient = (patientSelect ? patientSelect.value : '') || ($('recordPatient') ? $('recordPatient').value : '');
+    const visitDate = $('medRecVisitDate') ? $('medRecVisitDate').value : '';
+    const symptoms = $('medRecSymptoms') ? $('medRecSymptoms').value.trim() : '';
+    const diagnosis = $('medRecDiagnosis') ? $('medRecDiagnosis').value.trim() : '';
+    const treatment = $('medRecTreatment') ? $('medRecTreatment').value.trim() : '';
+
+    if (!patient) {
+      showToast('Please select a patient', 'error');
+      showCarePlusToast('Please select a patient before saving.', 'warning', 'Missing Patient');
+      return;
+    }
+    if (!symptoms || !diagnosis || !treatment) {
+      showToast('Please fill in symptoms, diagnosis, and treatment', 'error');
+      showCarePlusToast('Symptoms, diagnosis, and treatment notes are required.', 'warning', 'Incomplete Form');
+      return;
+    }
+
+    const btn = $('btnSubmitMedRec');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Saving...</span>';
+    }
+
+    const docId = (globalDoctorData && globalDoctorData.doctor && globalDoctorData.doctor.name) || '';
+
+    try {
+      const response = await fetch('/api/method/hospital_management.api.create_medical_record', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Frappe-CSRF-Token': (window.frappe && window.frappe.csrf_token) || ''
+        },
+        body: JSON.stringify({
+          patient: patient,
+          doctor: docId,
+          visit_date: visitDate,
+          symptoms: symptoms,
+          diagnosis: diagnosis,
+          treatment: treatment
+        })
+      });
+
+      const data = await response.json();
+      const res = data.message || {};
+
+      if (response.ok && res.status === 'success') {
+        closeAddMedicalRecordModal();
+        showToast('Medical record saved successfully!', 'success');
+        showCarePlusToast('Medical record saved successfully!', 'success', 'Record Saved');
+        const rec = res.record;
+        if (rec) {
+          appendMedicalRecordRow(rec);
+          incrementMedicalRecordCount();
+        }
+      } else {
+        const errorMsg = res.message || data.exception || data._server_messages || 'Failed to save medical record';
+        showToast(errorMsg, 'error');
+        showCarePlusToast(errorMsg, 'error', 'Save Error');
+      }
+    } catch (err) {
+      console.error('Error saving medical record:', err);
+      showToast('Network error while saving record', 'error');
+      showCarePlusToast(err.message || 'Network error while saving record', 'error', 'Network Error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>💾 Save Medical Record</span>';
+      }
+    }
+  }
+
+  function appendMedicalRecordRow(r) {
+    if (!window.cachedMedicalRecords) window.cachedMedicalRecords = [];
+    window.cachedMedicalRecords.unshift(r);
+
+    const tbody = $('rec-tbody');
+    if (!tbody) return;
+
+    // If table only has empty-state row, clear it
+    if (tbody.querySelector('.empty-state')) {
+      tbody.innerHTML = '';
+    }
+
+    const tr = document.createElement('tr');
+    tr.style.animation = 'highlightFade 2s ease';
+    tr.innerHTML = `
+      <td>${fmtDate(r.visit_date)}</td>
+      <td>${renderPatientClickable(r.patient_name || r.patient, true)}</td>
+      <td>${fmt(r.symptoms)}</td>
+      <td>${fmt(r.diagnosis)}</td>
+      <td>${fmt(r.treatment)}</td>
+      <td style="text-align:right; white-space:nowrap;">
+        <button class="btn-action" style="padding:4px 9px; font-size:12px; border-radius:6px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; cursor:pointer;" onclick="viewMedicalRecordDetails('${escapeHtml(r.name)}')">
+          👁️ Details
+        </button>
+        <button class="btn-action" style="padding:4px 9px; font-size:12px; border-radius:6px; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.3); color:#38bdf8; cursor:pointer; margin-left:6px;" onclick="printMedicalRecordSummary('${escapeHtml(r.name)}')">
+          🖨️ Print
+        </button>
+      </td>
+    `;
+    tbody.insertBefore(tr, tbody.firstChild);
+  }
+
+  function incrementMedicalRecordCount() {
+    // Update rec-count badge in Medical Records tab
+    const badge = $('rec-count');
+    if (badge) {
+      const current = parseInt(badge.textContent.trim()) || 0;
+      badge.textContent = current + 1;
+    }
+    // Update stat-rec stat card
+    const stat = $('stat-rec');
+    if (stat) {
+      const current = parseInt(stat.textContent.trim()) || 0;
+      stat.textContent = current + 1;
+    }
+  }
+
+  window.activeMedicalRecordDetails = null;
+
+  function viewMedicalRecordDetails(recId) {
+    const rec = (window.cachedMedicalRecords || []).find(r => r.name === recId);
+    if (!rec) {
+      showToast('Record not found', 'error');
+      return;
+    }
+    window.activeMedicalRecordDetails = rec;
+    const docName = (globalDoctorData && globalDoctorData.doctor && (globalDoctorData.doctor.formatted_name || globalDoctorData.doctor.doctor_name)) || 'Doctor';
+
+    const content = `
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div>
+            <span style="font-size:11px; text-transform:uppercase; color:var(--text-dim); display:block; margin-bottom:2px;">Patient</span>
+            <strong style="font-size:15px; color:var(--blue);">${escapeHtml(rec.patient_name || rec.patient)}</strong>
+          </div>
+          <div>
+            <span style="font-size:11px; text-transform:uppercase; color:var(--text-dim); display:block; margin-bottom:2px;">Visit Date</span>
+            <strong style="font-size:14px; color:var(--text);">${escapeHtml(fmtDate(rec.visit_date))}</strong>
+          </div>
+          <div>
+            <span style="font-size:11px; text-transform:uppercase; color:var(--text-dim); display:block; margin-bottom:2px;">Doctor</span>
+            <span style="font-size:13px; color:var(--text);">${escapeHtml(docName)}</span>
+          </div>
+          <div>
+            <span style="font-size:11px; text-transform:uppercase; color:var(--text-dim); display:block; margin-bottom:2px;">Record ID</span>
+            <span style="font-size:12px; font-family:monospace; color:var(--text-dim);">${escapeHtml(rec.name)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <div>
+          <label style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--amber); display:block; margin-bottom:4px;">Symptoms</label>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text); font-size:13px; white-space:pre-wrap;">${escapeHtml(rec.symptoms || '—')}</div>
+        </div>
+
+        <div>
+          <label style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--red); display:block; margin-bottom:4px;">Diagnosis</label>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text); font-size:13px; white-space:pre-wrap;">${escapeHtml(rec.diagnosis || '—')}</div>
+        </div>
+
+        <div>
+          <label style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--green); display:block; margin-bottom:4px;">Treatment & Clinical Notes</label>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text); font-size:13px; white-space:pre-wrap;">${escapeHtml(rec.treatment || '—')}</div>
+        </div>
+
+        ${rec.examination_findings ? `
+        <div>
+          <label style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--indigo); display:block; margin-bottom:4px;">Examination Findings</label>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text); font-size:13px; white-space:pre-wrap;">${escapeHtml(rec.examination_findings)}</div>
+        </div>` : ''}
+
+        ${rec.clinical_observations ? `
+        <div>
+          <label style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--blue); display:block; margin-bottom:4px;">Clinical Observations</label>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text); font-size:13px; white-space:pre-wrap;">${escapeHtml(rec.clinical_observations)}</div>
+        </div>` : ''}
+      </div>
+    `;
+
+    $('medRecDetailsContent').innerHTML = content;
+    $('viewMedicalRecordModal').style.display = 'flex';
+  }
+
+  function closeViewMedicalRecordModal() {
+    $('viewMedicalRecordModal').style.display = 'none';
+    window.activeMedicalRecordDetails = null;
+  }
+
+  function printCurrentMedicalRecord() {
+    if (window.activeMedicalRecordDetails) {
+      printMedicalRecordSummary(window.activeMedicalRecordDetails.name);
+    }
+  }
+
+  function printMedicalRecordSummary(recId) {
+    const rec = (window.cachedMedicalRecords || []).find(r => r.name === recId);
+    if (!rec) {
+      showToast('Record not found', 'error');
+      return;
+    }
+    const printWindow = window.open('', '_blank', 'width=800,height=700');
+    if (!printWindow) {
+      showToast('Please allow popups to print summary', 'error');
+      return;
+    }
+    const docName = (globalDoctorData && globalDoctorData.doctor && (globalDoctorData.doctor.formatted_name || globalDoctorData.doctor.doctor_name)) || 'Doctor';
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Medical Record Summary - ${escapeHtml(rec.patient_name || rec.patient)}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1e293b; padding: 40px; margin: 0; }
+          .header { border-bottom: 2px solid #0284c7; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
+          .logo { font-size: 24px; font-weight: 800; color: #0284c7; }
+          .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; }
+          .meta-item { font-size: 14px; }
+          .meta-item strong { color: #64748b; font-size: 12px; text-transform: uppercase; display: block; margin-bottom: 2px; }
+          .section-box { margin-bottom: 20px; }
+          .section-box h4 { margin: 0 0 6px 0; font-size: 14px; text-transform: uppercase; color: #0369a1; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+          .section-box p { margin: 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap; background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 1px solid #f1f5f9; }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #cbd5e1; display: flex; justify-content: space-between; font-size: 12px; color: #64748b; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="logo">🏥 CAREPLUS HEALTH SYSTEM</div>
+            <div style="font-size: 13px; color: #64748b;">Clinical Encounter & Medical Record Summary</div>
+          </div>
+          <div style="text-align: right; font-size: 13px;">
+            <strong>Record Ref:</strong> ${escapeHtml(rec.name)}<br>
+            <strong>Date:</strong> ${escapeHtml(fmtDate(rec.visit_date))}
+          </div>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-item">
+            <strong>Patient Name / ID</strong>
+            ${escapeHtml(rec.patient_name || rec.patient)}
+          </div>
+          <div class="meta-item">
+            <strong>Attending Practitioner</strong>
+            ${escapeHtml(docName)}
+          </div>
+          <div class="meta-item">
+            <strong>Encounter / Visit Date</strong>
+            ${escapeHtml(fmtDate(rec.visit_date))}
+          </div>
+          <div class="meta-item">
+            <strong>Consultation Status</strong>
+            ${escapeHtml(rec.consultation_status || 'Finalized')}
+          </div>
+        </div>
+
+        <div class="section-box">
+          <h4>Presenting Symptoms</h4>
+          <p>${escapeHtml(rec.symptoms || 'None recorded')}</p>
+        </div>
+
+        <div class="section-box">
+          <h4>Clinical Diagnosis</h4>
+          <p>${escapeHtml(rec.diagnosis || 'None recorded')}</p>
+        </div>
+
+        <div class="section-box">
+          <h4>Treatment Plan & Clinical Notes</h4>
+          <p>${escapeHtml(rec.treatment || 'None recorded')}</p>
+        </div>
+
+        ${rec.examination_findings ? `
+        <div class="section-box">
+          <h4>Physical Examination Findings</h4>
+          <p>${escapeHtml(rec.examination_findings)}</p>
+        </div>` : ''}
+
+        ${rec.clinical_observations ? `
+        <div class="section-box">
+          <h4>Clinical Observations</h4>
+          <p>${escapeHtml(rec.clinical_observations)}</p>
+        </div>` : ''}
+
+        <div class="footer">
+          <div>Printed from CarePlus Portal · Confidential Patient Medical Record</div>
+          <div style="border-top: 1px solid #94a3b8; width: 200px; text-align: center; padding-top: 4px;">Doctor Signature</div>
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(function() {
+      try {
+        printWindow.print();
+      } catch (err) {
+        console.warn('Auto-print exception:', err);
+      }
+    }, 250);
+  }
+
 </script>
+
+<!-- Floating Toast Notification Container -->
+<div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
+
+
+<!-- CAREPLUS REUSABLE NOTIFICATION / CONFIRMATION MODAL -->
+<div class="careplus-modal-backdrop" id="careplusConfirmModalBackdrop" style="display:none;" onclick="handleCareplusModalBackdrop(event)">
+  <div class="careplus-modal-card" id="careplusConfirmModalCard" role="dialog" aria-modal="true">
+    <div class="careplus-modal-glow"></div>
+    <div class="careplus-modal-header-icon" id="careplusModalIcon">🔔</div>
+    <h3 class="careplus-modal-title" id="careplusModalTitle">Confirmation</h3>
+    <p class="careplus-modal-desc" id="careplusModalDesc">Are you sure you want to proceed?</p>
+    <p class="careplus-modal-subtext" id="careplusModalSubtext"></p>
+    <div class="careplus-modal-actions">
+      <button type="button" class="careplus-btn-cancel" id="careplusModalCancelBtn" onclick="resolveCareplusConfirm(false)">Cancel</button>
+      <button type="button" class="careplus-btn-confirm" id="careplusModalConfirmBtn" onclick="resolveCareplusConfirm(true)">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- CAREPLUS TOP-RIGHT FLOATING TOAST CONTAINER -->
+<div id="careplusToastContainer" class="careplus-toast-container" role="status" aria-live="polite"></div>
 
 </body>
 </html>

@@ -3,7 +3,7 @@
  "allow_bulk_edit": 1,
  "allow_rename": 1,
  "autoname": "field:patient_name",
- "creation": "2026-10-10 12:36:53.814524",
+ "creation": "2026-10-23 10:55:51.026180",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -19,7 +19,9 @@
   "naming_series",
   "medical_history",
   "patient_type",
-  "room_number"
+  "room_number",
+  "user_id",
+  "status"
  ],
  "fields": [
   {
@@ -30,6 +32,7 @@
    "fieldname": "patient_name",
    "fieldtype": "Data",
    "label": "Patient Name",
+   "reqd": 1,
    "unique": 1
   },
   {
@@ -46,12 +49,14 @@
   {
    "fieldname": "phone",
    "fieldtype": "Phone",
-   "label": "Phone"
+   "label": "Phone",
+   "reqd": 1
   },
   {
    "fieldname": "email",
    "fieldtype": "Data",
-   "label": "Email"
+   "label": "Email",
+   "reqd": 1
   },
   {
    "fieldname": "address",
@@ -91,12 +96,47 @@
    "fieldname": "room_number",
    "fieldtype": "Data",
    "label": "Room Number"
+  },
+  {
+   "fieldname": "ward_type",
+   "fieldtype": "Select",
+   "label": "Ward Type",
+   "options": "General Ward\nSemi-Private\nDeluxe\nICU"
+  },
+  {
+   "fieldname": "admission_date",
+   "fieldtype": "Date",
+   "label": "Admission Date"
+  },
+  {
+   "fieldname": "discharge_date",
+   "fieldtype": "Date",
+   "label": "Discharge Date"
+  },
+  {
+   "fieldname": "room_rate",
+   "fieldtype": "Currency",
+   "label": "Room Rate"
+  },
+  {
+   "fieldname": "user_id",
+   "fieldtype": "Link",
+   "label": "Linked User Account",
+   "options": "User"
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Patient Status",
+   "options": "Active\nInactive\nDischarged"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-13 14:35:16.197735",
+ "modified": "2026-10-27 09:58:25.315445",
  "modified_by": "Administrator",
  "module": "Hospital Management",
  "name": "Patient",
@@ -106,35 +146,44 @@
   {
    "create": 1,
    "delete": 1,
-   "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
    "role": "System Manager",
-   "share": 1,
    "write": 1
   },
   {
    "create": 1,
    "delete": 1,
-   "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "Receptionist",
-   "share": 1,
+   "role": "Hospital Administrator",
    "write": 1
   },
   {
-   "email": 1,
-   "export": 1,
    "print": 1,
    "read": 1,
-   "report": 1,
    "role": "doctor",
-   "share": 1
+   "write": 1
+  },
+  {
+   "create": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Nurse",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Pharmacy Staff"
+  },
+  {
+   "read": 1,
+   "role": "patient",
+   "write": 1
   }
  ],
  "row_format": "Dynamic",

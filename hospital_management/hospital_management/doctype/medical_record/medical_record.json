@@ -15,7 +15,11 @@
   "symptoms",
   "diagnosis",
   "treatment",
-  "naming_series"
+  "naming_series",
+  "examination_findings",
+  "clinical_observations",
+  "follow_up_date",
+  "consultation_status"
  ],
  "fields": [
   {
@@ -65,12 +69,35 @@
    "fieldtype": "Select",
    "label": "Naming Series",
    "options": "MED-.YYYY.-.#####"
+  },
+  {
+   "fieldname": "examination_findings",
+   "fieldtype": "Small Text",
+   "label": "Examination Findings"
+  },
+  {
+   "fieldname": "clinical_observations",
+   "fieldtype": "Small Text",
+   "label": "Clinical Observations"
+  },
+  {
+   "fieldname": "follow_up_date",
+   "fieldtype": "Date",
+   "label": "Follow-Up Date"
+  },
+  {
+   "fieldname": "consultation_status",
+   "fieldtype": "Select",
+   "label": "Consultation Status",
+   "options": "Draft\nFinalized",
+   "default": "Finalized",
+   "in_list_view": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-20 10:14:53.026538",
+ "modified": "2026-10-23 11:15:00.000000",
  "modified_by": "Administrator",
  "module": "Hospital Management",
  "name": "Medical Record",
@@ -78,27 +105,46 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
-   "email": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "report": 1
   },
   {
+   "role": "Hospital Administrator",
+   "read": 1,
+   "write": 1,
    "create": 1,
-   "email": 1,
+   "delete": 0,
    "export": 1,
    "print": 1,
+   "report": 1
+  },
+  {
+   "role": "Doctor",
    "read": 1,
-   "report": 1,
-   "role": "doctor",
-   "share": 1,
-   "write": 1
+   "write": 1,
+   "create": 1,
+   "delete": 0,
+   "print": 1
+  },
+  {
+   "role": "Nurse",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0
+  },
+  {
+   "role": "Patient",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0
   }
  ],
  "row_format": "Dynamic",

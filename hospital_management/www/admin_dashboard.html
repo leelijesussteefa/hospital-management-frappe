@@ -1,0 +1,3581 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title or "CarePlus | Admin Master Portal" }}</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <script>
+    (function initSessionGuard() {
+      // 1. Immediate server-rendered session validation
+      const sessionUser = "{{ frappe.session.user }}";
+      if (!sessionUser || sessionUser === "Guest") {
+        window.history.replaceState(null, document.title, '/frontend');
+        window.location.replace('/frontend');
+        return;
+      }
+
+      // Replace current state so back navigation cannot freely reopen authenticated dashboard pages without valid credentials
+      window.history.replaceState(null, document.title, window.location.href);
+
+      // 2. Client-side session verification against backend API
+      async function checkAuthSession() {
+        try {
+          const res = await fetch('/api/method/hospital_management.api.check_session', {
+            method: 'GET',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            },
+            cache: 'no-store'
+          });
+          if (!res.ok) {
+            window.history.replaceState(null, document.title, '/frontend');
+            window.location.replace('/frontend');
+            return;
+          }
+          const data = await res.json();
+          const info = (data && data.message) ? data.message : data;
+          if (!info || info.status === 'unauthenticated' || !info.user || info.user === 'Guest') {
+            window.history.replaceState(null, document.title, '/frontend');
+            window.location.replace('/frontend');
+          }
+        } catch (err) {
+          console.warn('Session verification error:', err);
+        }
+      }
+      window.checkAuthSession = checkAuthSession;
+
+      // 3. Initial page load validation
+      checkAuthSession();
+
+      // 4. Prevent Browser Back-Forward Cache (bfcache)
+      window.addEventListener('pageshow', function (event) {
+        if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+          // If restored from back-forward cache, verify active session
+          checkAuthSession();
+        }
+      });
+
+      // 5. Enforce history lock and validate on popstate (back navigation)
+      function lockNavigation() {
+        window.history.pushState(null, document.title, window.location.href);
+      }
+      lockNavigation();
+
+      window.addEventListener('popstate', function (event) {
+        checkAuthSession();
+        lockNavigation();
+      });
+
+      // 6. Trap Backspace on non-input elements
+      window.addEventListener('keydown', function (e) {
+        if (e.key === 'Backspace' || e.keyCode === 8) {
+          const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+          const isEditable = document.activeElement && (
+            document.activeElement.isContentEditable ||
+            tag === 'input' ||
+            tag === 'textarea' ||
+            tag === 'select'
+          );
+          if (!isEditable) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }
+      }, true);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #090d16;
+      --surface: #0f172a;
+      --surface2: #1e293b;
+      --surface3: #334155;
+      --border: #334155;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --indigo: #6366f1;
+      --emerald: #10b981;
+      --emerald-bg: rgba(16, 16, 185, 0.12);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.12);
+      --rose: #f43f5e;
+      --rose-bg: rgba(244, 63, 94, 0.12);
+      --purple: #a855f7;
+      --purple-bg: rgba(168, 85, 247, 0.12);
+      --text: #f8fafc;
+      --text-dim: #94a3b8;
+      --text-dark: #64748b;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      background-image:
+        radial-gradient(circle at 10% 15%, rgba(14, 165, 233, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.95) 0%, #060a12 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* TOP NAVBAR */
+    .navbar {
+      height: 72px;
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #f43f5e, #ec4899 50%, #8b5cf6 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 16px rgba(244, 63, 94, 0.35);
+    }
+
+    .brand-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-title span.badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.35);
+      border-radius: 6px;
+      color: #fb7185;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulseGreen 2s infinite;
+    }
+
+    @keyframes pulseGreen {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.4;
+        transform: scale(0.85);
+      }
+    }
+
+    .nav-link-btn {
+      text-decoration: none;
+      color: var(--text-dim);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 13px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-link-btn:hover {
+      color: #fff;
+      border-color: var(--primary);
+      background: rgba(56, 189, 248, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .nav-link-btn.btn-logout {
+      border-color: rgba(244, 63, 94, 0.3);
+      color: #fda4af;
+      cursor: pointer;
+    }
+
+    .nav-link-btn.btn-logout:hover {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: #f43f5e;
+      color: #fff;
+    }
+
+    /* MAIN CONTAINER */
+    .container {
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 28px 32px 48px;
+      flex: 1;
+    }
+
+    /* HERO BANNER */
+    .hero-banner {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 26px 30px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    .hero-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .hero-title span {
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    .portal-quick-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .portal-chip {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 9px 15px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.7);
+      color: var(--text);
+      transition: all 0.25s ease;
+    }
+
+    .portal-chip.doctor:hover {
+      border-color: var(--primary);
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      transform: translateY(-2px);
+    }
+
+    .portal-chip.patient:hover {
+      border-color: var(--purple);
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+      transform: translateY(-2px);
+    }
+
+    .portal-chip.pharmacy:hover {
+      border-color: var(--emerald);
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      transform: translateY(-2px);
+    }
+
+    .portal-chip.billing:hover {
+      border-color: var(--amber);
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      transform: translateY(-2px);
+    }
+
+    /* METRICS GRID */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-bottom: 32px;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 22px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.6);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .metric-card.doctor:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      box-shadow: 0 12px 28px -8px rgba(56, 189, 248, 0.2);
+    }
+
+    .metric-card.patient:hover {
+      border-color: rgba(168, 85, 247, 0.4);
+      box-shadow: 0 12px 28px -8px rgba(168, 85, 247, 0.2);
+    }
+
+    .metric-card.pharmacy:hover {
+      border-color: rgba(16, 185, 129, 0.4);
+      box-shadow: 0 12px 28px -8px rgba(16, 185, 129, 0.2);
+    }
+
+    .metric-card.billing:hover {
+      border-color: rgba(245, 158, 11, 0.4);
+      box-shadow: 0 12px 28px -8px rgba(245, 158, 11, 0.2);
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+
+    .metric-card.doctor::before {
+      background: linear-gradient(90deg, #38bdf8, #0284c7);
+    }
+
+    .metric-card.patient::before {
+      background: linear-gradient(90deg, #c084fc, #9333ea);
+    }
+
+    .metric-card.pharmacy::before {
+      background: linear-gradient(90deg, #34d399, #059669);
+    }
+
+    .metric-card.billing::before {
+      background: linear-gradient(90deg, #fbbf24, #d97706);
+    }
+
+    .metric-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-dim);
+    }
+
+    .metric-icon-wrap {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .metric-card.doctor .metric-icon-wrap {
+      background: rgba(56, 189, 248, 0.12);
+      color: #38bdf8;
+    }
+
+    .metric-card.patient .metric-icon-wrap {
+      background: rgba(168, 85, 247, 0.12);
+      color: #c084fc;
+    }
+
+    .metric-card.pharmacy .metric-icon-wrap {
+      background: rgba(16, 185, 129, 0.12);
+      color: #34d399;
+    }
+
+    .metric-card.billing .metric-icon-wrap {
+      background: rgba(245, 158, 11, 0.12);
+      color: #fbbf24;
+    }
+
+    .metric-val {
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+
+    .metric-sub {
+      font-size: 12px;
+      color: var(--text-dark);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .metric-sub span.highlight {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    /* TABS SECTION */
+    .tabs-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+      padding-bottom: 8px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+      background: rgba(30, 41, 59, 0.5);
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      background: var(--surface2);
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    }
+
+    .tab-btn.active[data-tab="doctors"] {
+      border-bottom: 2px solid #38bdf8;
+      color: #38bdf8;
+    }
+
+    .tab-btn.active[data-tab="patients"] {
+      border-bottom: 2px solid #c084fc;
+      color: #c084fc;
+    }
+
+    .tab-btn.active[data-tab="pharmacy"] {
+      border-bottom: 2px solid #34d399;
+      color: #34d399;
+    }
+
+    .tab-btn.active[data-tab="billing"] {
+      border-bottom: 2px solid #fbbf24;
+      color: #fbbf24;
+    }
+
+    .tab-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: inherit;
+    }
+
+    /* TAB CONTENT PANELS */
+    .tab-pane {
+      display: none;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* PANEL TOOLBAR */
+    .panel-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      max-width: 380px;
+      min-width: 240px;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 42px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0 16px 0 38px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+      background: rgba(15, 23, 42, 0.95);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dark);
+      pointer-events: none;
+      font-size: 15px;
+    }
+
+    .filter-chips {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .filter-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .filter-chip:hover,
+    .filter-chip.active {
+      background: var(--surface2);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-launch-portal {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 10px 18px;
+      border-radius: 10px;
+      color: #fff;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      transition: all 0.2s ease;
+    }
+
+    .btn-launch-portal:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.5);
+    }
+
+    .btn-launch-portal.doc-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38bdf8;
+      color: #38bdf8;
+    }
+
+    .btn-launch-portal.pat-btn:hover {
+      background: rgba(168, 85, 247, 0.2);
+      border-color: #c084fc;
+      color: #c084fc;
+    }
+
+    .btn-launch-portal.rx-btn:hover {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: #34d399;
+      color: #34d399;
+    }
+
+    .btn-launch-portal.bill-btn:hover {
+      background: rgba(245, 158, 11, 0.2);
+      border-color: #fbbf24;
+      color: #fbbf24;
+    }
+
+    /* DATA TABLE */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    .data-table thead th {
+      background: rgba(30, 41, 59, 0.7);
+      color: var(--text-dim);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table tbody td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: #e2e8f0;
+      vertical-align: middle;
+    }
+
+    .data-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .data-table tbody tr:hover td {
+      background: rgba(30, 41, 59, 0.4);
+    }
+
+    /* STATUS BADGES */
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 9999px;
+      text-transform: capitalize;
+    }
+
+    .badge-status.active,
+    .badge-status.paid,
+    .badge-status.dispensed {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+
+    .badge-status.pending,
+    .badge-status.unpaid,
+    .badge-status.draft {
+      background: rgba(244, 63, 94, 0.12);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fb7185;
+    }
+
+    .badge-status.partially-paid,
+    .badge-status.authorized {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fbbf24;
+    }
+
+    .badge-status.inactive {
+      background: rgba(148, 163, 184, 0.1);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      color: #94a3b8;
+    }
+
+    .id-tag {
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.1);
+      padding: 2px 7px;
+      border-radius: 5px;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .fee-text {
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .outstanding-due {
+      color: #fb7185;
+      font-weight: 600;
+    }
+
+    .outstanding-clear {
+      color: var(--text-dark);
+      font-weight: 600;
+    }
+
+    .badge-room {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 600;
+      font-size: 11.5px;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 3px 9px;
+      border-radius: 6px;
+      white-space: nowrap;
+      letter-spacing: -0.2px;
+    }
+
+    .badge-room.discharged {
+      color: #94a3b8;
+      background: rgba(148, 163, 184, 0.1);
+      border-color: rgba(148, 163, 184, 0.25);
+    }
+
+    .badge-room.pending {
+      color: #fbbf24;
+      background: rgba(251, 191, 36, 0.12);
+      border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    .btn-action-admit {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(56, 189, 248, 0.12);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn-action-admit:hover {
+      background: rgba(56, 189, 248, 0.25);
+      border-color: #38bdf8;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .btn-action-discharge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(244, 63, 94, 0.12);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.35);
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-action-discharge:hover {
+      background: rgba(244, 63, 94, 0.25);
+      border-color: #fb7185;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
+      transform: translateY(-1px);
+    }
+
+
+    .empty-row td {
+      text-align: center;
+      padding: 36px 18px;
+      color: var(--text-dark);
+      font-style: italic;
+    }
+
+    /* FOOTER */
+    .footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 22px 32px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-dark);
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    @media (max-width: 1024px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .hero-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 18px;
+      }
+
+      .container {
+        padding: 20px 16px 36px;
+      }
+
+      .navbar {
+        padding: 0 16px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .search-box {
+        max-width: 100%;
+      }
+
+      .nav-actions .user-pill {
+        display: none;
+      }
+    }
+
+    /* ADD DOCTOR BUTTON */
+    .btn-add-doctor {
+      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 10px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 16px rgba(14, 165, 233, 0.35);
+      white-space: nowrap;
+    }
+
+    .btn-add-doctor:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(14, 165, 233, 0.5);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    /* VIEW DESK BUTTON */
+    .btn-action-desk {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #38bdf8;
+      font-size: 11px;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-action-desk:hover {
+      background: rgba(56, 189, 248, 0.25);
+      color: #fff;
+      border-color: #38bdf8;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+    }
+
+    /* ADD PATIENT BUTTON */
+    .btn-add-patient {
+      background: linear-gradient(135deg, #10b981, #06b6d4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 10px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+      white-space: nowrap;
+    }
+
+    .btn-add-patient:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.5);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    /* ACTION PORTAL BUTTON */
+    .btn-action-portal {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      font-size: 11px;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-action-portal:hover {
+      background: #10b981;
+      border-color: #10b981;
+      color: #0b0f19;
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.4);
+      transform: translateY(-1px);
+    }
+
+    /* PATIENT TYPE BADGES */
+    .badge-type-ipd {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(239, 68, 68, 0.14);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      letter-spacing: 0.3px;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);
+      white-space: nowrap;
+    }
+
+    .badge-type-opd {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.14);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      letter-spacing: 0.3px;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+      white-space: nowrap;
+    }
+
+    .patient-name-link {
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+
+    .patient-name-link:hover {
+      color: #38bdf8;
+      text-decoration: underline;
+    }
+
+    .id-tag.patient-link {
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .id-tag.patient-link:hover {
+      background: rgba(56, 189, 248, 0.25);
+      border-color: #38bdf8;
+      color: #fff;
+    }
+
+    /* INTERACTIVE STATUS BADGE BUTTON */
+    .badge-status-btn {
+      background: none;
+      border: none;
+      font: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+      user-select: none;
+    }
+
+    .badge-status-btn.active {
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    .badge-status-btn.active:hover {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: #34d399;
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.35);
+      transform: scale(1.03);
+    }
+
+    .badge-status-btn.inactive {
+      background: rgba(244, 63, 94, 0.12);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fb7185;
+    }
+
+    .badge-status-btn.inactive:hover {
+      background: rgba(244, 63, 94, 0.22);
+      border-color: #fb7185;
+      box-shadow: 0 0 14px rgba(244, 63, 94, 0.35);
+      transform: scale(1.03);
+    }
+
+    .status-dot {
+      font-size: 10px;
+      line-height: 1;
+    }
+
+    /* GLASSMORPHISM MODAL */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 10, 18, 0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-card {
+      width: min(640px, 95vw);
+      max-height: 90vh;
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 20px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 35px rgba(56, 189, 248, 0.18);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.97);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.3px;
+    }
+
+    .modal-desc {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    .modal-close-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-dim);
+      font-size: 16px;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .modal-close-btn:hover {
+      background: rgba(244, 63, 94, 0.2);
+      color: #fb7185;
+      border-color: #fb7185;
+    }
+
+    .modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 16px;
+    }
+
+    .form-row.two-col>.form-group {
+      flex: 1;
+    }
+
+    .form-group.full-width {
+      width: 100%;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    .form-group label .req {
+      color: #fb7185;
+    }
+
+    .form-group label .opt {
+      font-size: 10px;
+      color: var(--text-dark);
+      font-weight: normal;
+    }
+
+    .form-control {
+      width: 100%;
+      height: 42px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 0 14px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .form-control:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+      background: rgba(15, 23, 42, 0.98);
+    }
+
+    select.form-control {
+      cursor: pointer;
+    }
+
+    select.form-control option {
+      background: #0f172a;
+      color: #f8fafc;
+    }
+
+    .form-hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      display: block;
+    }
+
+    .modal-alert {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .modal-alert.error {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    .btn-modal-cancel {
+      background: transparent;
+      border: 1px solid #334155;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-modal-cancel:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+    }
+
+    .btn-modal-submit {
+      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3);
+    }
+
+    .btn-modal-submit:hover {
+      box-shadow: 0 6px 20px rgba(14, 165, 233, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-modal-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* TOAST NOTIFICATIONS */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 2000;
+      pointer-events: none;
+    }
+
+    .toast {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 12px 18px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(12px);
+      animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.3s ease;
+    }
+
+    .toast.success {
+      border-color: rgba(16, 185, 129, 0.5);
+    }
+
+    .toast.success .t-icon {
+      color: #34d399;
+    }
+
+    .toast.error {
+      border-color: rgba(244, 63, 94, 0.5);
+    }
+
+    .toast.error .t-icon {
+      color: #fb7185;
+    }
+
+    @keyframes toastIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.95);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .row-highlight {
+      animation: highlightGlow 2.5s ease;
+    }
+
+    @keyframes highlightGlow {
+      0% {
+        background: rgba(56, 189, 248, 0.25);
+      }
+
+      100% {
+        background: transparent;
+      }
+    }
+
+
+    /* LOGOUT CONFIRMATION MODAL & TOP TOAST BANNER */
+    .modal-confirm-card {
+      width: min(480px, 92vw);
+      border: 1px solid rgba(244, 63, 94, 0.35);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(244, 63, 94, 0.18);
+    }
+
+    .modal-icon-danger {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.25), rgba(225, 29, 72, 0.35));
+      border: 1px solid rgba(244, 63, 94, 0.45);
+      color: #fda4af;
+      box-shadow: 0 4px 14px rgba(244, 63, 94, 0.3);
+    }
+
+    .logout-modal-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f1f5f9;
+      line-height: 1.5;
+      margin: 0 0 8px 0;
+    }
+
+    .logout-modal-subtext {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .btn-modal-logout {
+      background: linear-gradient(135deg, #f43f5e, #be123c);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(244, 63, 94, 0.35);
+    }
+
+    .btn-modal-logout:hover {
+      background: linear-gradient(135deg, #fb7185, #e11d48);
+      box-shadow: 0 6px 20px rgba(244, 63, 94, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .btn-modal-logout:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .top-toast-banner {
+      position: fixed;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.98));
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 9999px;
+      padding: 12px 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.85), 0 0 25px rgba(56, 189, 248, 0.25);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 3000;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .top-toast-banner.active {
+      top: 28px;
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .top-toast-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #34d399;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .top-toast-text {
+      color: #f8fafc;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+    }
+
+    .toast-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(56, 189, 248, 0.25);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: toastSpin 0.75s linear infinite;
+    }
+
+    @keyframes toastSpin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- TOP NAVBAR -->
+  <header class="navbar">
+    <div class="brand-section">
+      <div class="brand-logo">🏥</div>
+      <div class="brand-info">
+        <div class="brand-title">
+          CarePlus
+          <span class="badge">Admin Portal</span>
+        </div>
+        <div class="brand-subtitle">Master Unified Healthcare Control</div>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <div class="user-pill">
+        <span class="pulse-dot"></span>
+        <span>Administrator</span>
+      </div>
+      <a href="/doctor_dashboard" class="nav-link-btn" title="Doctor Clinical Desk">
+        <span>🩺</span> Doctor
+      </a>
+      <a href="/patient_dashboard" class="nav-link-btn" title="Patient Portal">
+        <span>🧑</span> Patient
+      </a>
+      <a href="/pharmacy_dashboard" class="nav-link-btn" title="Pharmacy Dispense Desk">
+        <span>💊</span> Pharmacy
+      </a>
+      <a href="/billing" class="nav-link-btn" title="Hospital Billing & Cashier">
+        <span>💳</span> Billing
+      </a>
+      <a href="/app" class="nav-link-btn" title="Frappe ERPNext Desk">
+        <span>⚙️</span> Desk
+      </a>
+      <button class="nav-link-btn btn-logout" onclick="openLogoutModal(event)" title="Sign out of portal">
+        <span>⏻</span> Logout
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="container">
+
+    <!-- HERO OVERVIEW BANNER -->
+    <section class="hero-banner">
+      <div>
+        <h1 class="hero-title">Welcome, <span>Hospital Administrator</span></h1>
+        <p class="hero-desc">
+          Live centralized governance across Clinical Encounters, Patient Demographics, Pharmacy Stock Dispensing, and
+          Cashier Billing.
+        </p>
+      </div>
+      <div class="portal-quick-links">
+        <a href="/doctor_dashboard" class="portal-chip doctor">🩺 Doctor Desk</a>
+        <a href="/patient_dashboard" class="portal-chip patient">🧑 Patient Portal</a>
+        <a href="/pharmacy_dashboard" class="portal-chip pharmacy">💊 Pharmacy Queue</a>
+        <a href="/billing" class="portal-chip billing">💳 Invoices & POS</a>
+      </div>
+    </section>
+
+    <!-- TOP 4 METRICS CARDS -->
+    <section class="metrics-grid">
+      <!-- 1. Doctor Management Card -->
+      <div class="metric-card doctor" onclick="switchTab('doctors')">
+        <div class="metric-header">
+          <span class="metric-label">Doctor Management</span>
+          <div class="metric-icon-wrap">🩺</div>
+        </div>
+        <div class="metric-val" id="metricActiveDoctors">{{ metrics.active_doctors }}</div>
+        <div class="metric-sub">
+          <span class="highlight">Active Practitioners</span> &middot; <span id="metricTotalDoctors">{{
+            metrics.total_doctors }}</span> Total Doctors
+        </div>
+      </div>
+
+      <!-- 2. Patient Management Card -->
+      <div class="metric-card patient" onclick="switchTab('patients')">
+        <div class="metric-header">
+          <span class="metric-label">Patient Management</span>
+          <div class="metric-icon-wrap">🧑</div>
+        </div>
+        <div class="metric-val" id="metricTotalPatients">{{ metrics.total_patients }}</div>
+        <div class="metric-sub">
+          <span class="highlight">Registered Patients</span> &middot; <span id="metricOpdIpdSummary">{{
+            metrics.opd_patients or 0 }} OPD &middot; {{ metrics.ipd_patients or 0 }} IPD</span>
+        </div>
+      </div>
+
+      <!-- 3. Pharmacy Dispensing Card -->
+      <div class="metric-card pharmacy" onclick="switchTab('pharmacy')">
+        <div class="metric-header">
+          <span class="metric-label">Pharmacy Dispensing</span>
+          <div class="metric-icon-wrap">💊</div>
+        </div>
+        <div class="metric-val">{{ metrics.pending_prescriptions }}</div>
+        <div class="metric-sub">
+          <span class="highlight">Pending Dispense</span> &middot; {{ metrics.dispensed_prescriptions }} Dispensed
+        </div>
+      </div>
+
+      <!-- 4. Hospital Invoices & Billing Card -->
+      <div class="metric-card billing" onclick="switchTab('billing')">
+        <div class="metric-header">
+          <span class="metric-label">Invoices & Billing</span>
+          <div class="metric-icon-wrap">💳</div>
+        </div>
+        <div class="metric-val">₹{{ "{:,.2f}".format(metrics.revenue_collected) }}</div>
+        <div class="metric-sub">
+          <span class="highlight">Collected</span> &middot; {{ metrics.total_invoices }} Invoices Total
+        </div>
+      </div>
+    </section>
+
+    <!-- INTERACTIVE MANAGEMENT TABS -->
+    <nav class="tabs-header">
+      <button type="button" class="tab-btn active" data-tab="doctors" onclick="switchTab('doctors')">
+        <span>🩺</span> Doctor Management
+        <span class="tab-badge" id="badgeDoctorCount">{{ doctors|length }}</span>
+      </button>
+      <button type="button" class="tab-btn" data-tab="patients" onclick="switchTab('patients')">
+        <span>🧑</span> Patient Management
+        <span class="tab-badge" id="badgePatientCount">{{ patients|length }}</span>
+      </button>
+      <button type="button" class="tab-btn" data-tab="pharmacy" onclick="switchTab('pharmacy')">
+        <span>💊</span> Pharmacy & Medicine Dispensing
+        <span class="tab-badge">{{ prescriptions|length }}</span>
+      </button>
+      <button type="button" class="tab-btn" data-tab="billing" onclick="switchTab('billing')">
+        <span>💳</span> Hospital Invoices & Billing
+        <span class="tab-badge">{{ invoices|length }}</span>
+      </button>
+    </nav>
+
+    <!-- TAB 1: DOCTOR MANAGEMENT -->
+    <section class="tab-pane active" id="pane-doctors">
+      <div class="panel-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="searchDoctors"
+            placeholder="Search doctor by name, department, or specialization…" oninput="filterDoctors()">
+        </div>
+        <div class="filter-chips">
+          <button type="button" class="filter-chip active" id="chipDoctorAll"
+            onclick="filterDoctorStatus('all', this)">All ({{ doctors|length }})</button>
+          <button type="button" class="filter-chip" id="chipDoctorActive"
+            onclick="filterDoctorStatus('active', this)">Active ({{ metrics.active_doctors }})</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-left:auto; flex-wrap:wrap;">
+          <button type="button" class="btn-add-doctor" onclick="openAddDoctorModal()">
+            <span style="font-size:15px; font-weight:800;">＋</span> Add New Doctor
+          </button>
+          <a href="/doctor_dashboard{% if doctors %}?doctor={{ doctors[0].name|urlencode }}{% endif %}"
+            class="btn-launch-portal doc-btn" title="Open doctor clinical desk">
+            <span>🩺</span> Open Doctor Clinical Desk &rarr;
+          </a>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table class="data-table" id="doctorsTable">
+          <thead>
+            <tr>
+              <th>Doctor Name</th>
+              <th>Department</th>
+              <th>Specialization</th>
+              <th>Phone</th>
+              <th>Consultation Fee</th>
+              <th>Shift Schedule</th>
+              <th style="text-align:center;">Status</th>
+              <th style="text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="doctorsTableBody">
+            {% for doc in doctors %}
+            <tr class="doctor-row" data-docname="{{ doc.name }}"
+              data-name="{{ (doc.formatted_name or doc.doctor_name)|lower }}"
+              data-dept="{{ (doc.department or '')|lower }}" data-spec="{{ (doc.specialization or '')|lower }}"
+              data-active="{{ '1' if doc.is_active else '0' }}">
+              <td>
+                <div style="font-weight:700; color:#fff;" class="doc-display-name">{{ doc.formatted_name or
+                  (doc.doctor_name if doc.doctor_name.startswith('Dr') else 'Dr. ' + doc.doctor_name) }}</div>
+                <span class="id-tag">{{ doc.name }}</span>
+              </td>
+              <td>{{ doc.department or 'General' }}</td>
+              <td>{{ doc.specialization or 'General Practitioner' }}</td>
+              <td>{{ doc.phone or '—' }}</td>
+              <td class="fee-text">₹{{ "{:,.2f}".format(doc.consultation_fee or 0) }}</td>
+              <td>
+                {% if doc.shift_start_time and doc.shift_end_time %}
+                <span style="font-size:12px; color:var(--text-dim);">{{ doc.shift_start_time }} - {{ doc.shift_end_time
+                  }}</span>
+                {% else %}
+                <span style="font-size:12px; color:var(--text-dark);">Standard Shift</span>
+                {% endif %}
+              </td>
+              <td style="text-align:center;">
+                <button type="button" class="badge-status-btn {% if doc.is_active %}active{% else %}inactive{% endif %}"
+                  onclick="toggleDoctorStatus('{{ doc.name }}', this)" data-active="{{ '1' if doc.is_active else '0' }}"
+                  title="Click to toggle status: Active Duty / Off Duty">
+                  {% if doc.is_active %}
+                  <span class="status-dot">●</span> Active Duty
+                  {% else %}
+                  <span class="status-dot">○</span> Inactive / Off Duty
+                  {% endif %}
+                </button>
+              </td>
+              <td style="text-align:center;">
+                <a href="/doctor_dashboard?doctor={{ doc.name|urlencode }}" class="btn-action-desk"
+                  title="Open {{ doc.formatted_name }}'s clinical desk">
+                  <span>🩺</span> View Desk &rarr;
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr class="empty-row" id="noDoctorsRow">
+              <td colspan="8">No doctor records registered.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 2: PATIENT MANAGEMENT -->
+    <section class="tab-pane" id="pane-patients">
+      <div class="panel-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="searchPatients"
+            placeholder="Search patient by name, ID, phone, or email…" oninput="filterPatients()">
+        </div>
+        <div class="filter-chips">
+          <button type="button" class="filter-chip active" id="chipPatientAll"
+            onclick="filterPatientType('all', this)">All Patients (<span id="countPatientAll">{{ patients|length
+              }}</span>)</button>
+          <button type="button" class="filter-chip" id="chipPatientOPD"
+            onclick="filterPatientType('opd', this)">Outpatient (OPD) (<span id="countPatientOPD">{{
+              metrics.opd_patients or 0 }}</span>)</button>
+          <button type="button" class="filter-chip" id="chipPatientIPD"
+            onclick="filterPatientType('ipd', this)">Inpatient (IPD) (<span id="countPatientIPD">{{ metrics.ipd_patients
+              or 0 }}</span>)</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-left:auto; flex-wrap:wrap;">
+          <button type="button" class="btn-add-patient" onclick="openAddPatientModal()">
+            <span style="font-size:15px; font-weight:800;">＋</span> Add New Patient
+          </button>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table class="data-table" id="patientsTable">
+          <thead>
+            <tr>
+              <th>Patient ID</th>
+              <th>Full Name</th>
+              <th>Gender</th>
+              <th>Patient Type</th>
+              <th>Room / Bed No</th>
+              <th>Contact Phone</th>
+              <th>Email</th>
+              <th>Blood Group</th>
+              <th>Date of Birth</th>
+              <th style="text-align:center;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="patientsTableBody">
+            {% for p in patients %}
+            <tr class="patient-row" data-name="{{ p.patient_name|lower }}" data-id="{{ p.name|lower }}"
+              data-phone="{{ (p.phone or '')|lower }}" data-email="{{ (p.email or '')|lower }}"
+              data-type="{{ 'inpatient' if p.is_inpatient or p.patient_type == 'Inpatient' else 'outpatient' }}">
+              <td>
+                <a href="/patient_dashboard?patient={{ p.name|urlencode }}" class="id-tag patient-link"
+                  title="Open {{ p.patient_name }}'s portal">{{ p.name }}</a>
+              </td>
+              <td>
+                <a href="/patient_dashboard?patient={{ p.name|urlencode }}" class="patient-name-link"
+                  title="Open {{ p.patient_name }}'s portal">
+                  {{ p.patient_name }}
+                </a>
+              </td>
+              <td>{{ p.gender or '—' }}</td>
+              <td>
+                {% if p.is_inpatient or p.patient_type == 'Inpatient' %}
+                <span class="badge-type-ipd">
+                  🏥 Inpatient (IPD)
+                </span>
+                {% else %}
+                <span class="badge-type-opd">
+                  🚶 Outpatient (OPD)
+                </span>
+                {% endif %}
+              </td>
+              <td>
+                {% if (p.is_inpatient or p.patient_type == 'Inpatient') and p.status != 'Discharged' and p.room_number
+                %}
+                <span class="badge-room"
+                  title="Ward: {{ p.ward_type or 'General Ward' }} &middot; Rate: ₹{{ '{:,.0f}'.format(p.room_rate or 1000) }}/day">
+                  🛏️ {{ p.room_number }}
+                </span>
+                {% elif (p.is_inpatient or p.patient_type == 'Inpatient') and p.status == 'Discharged' %}
+                <span class="badge-room discharged"
+                  title="Discharged{% if p.discharge_date %} on {{ p.discharge_date }}{% endif %}">
+                  🚪 Discharged
+                </span>
+                {% elif (p.is_inpatient or p.patient_type == 'Inpatient') %}
+                <span class="badge-room pending" title="Inpatient room assignment pending">
+                  ⚠️ Room Pending
+                </span>
+                {% else %}
+                <span style="color:var(--text-dark); font-size:12px;">N/A (OPD)</span>
+                {% endif %}
+              </td>
+              <td>{{ p.phone or '—' }}</td>
+              <td>{{ p.email or '—' }}</td>
+              <td>
+                {% if p.blood_group %}
+                <span
+                  style="display:inline-block; font-weight:700; color:#f43f5e; background:rgba(244,63,94,0.12); padding:1px 7px; border-radius:5px; border:1px solid rgba(244,63,94,0.25);">{{
+                  p.blood_group }}</span>
+                {% else %}
+                <span style="color:var(--text-dark);">—</span>
+                {% endif %}
+              </td>
+              <td style="color:var(--text-dim);">{{ p.date_of_birth or '—' }}</td>
+              <td style="text-align:center;">
+                <div style="display:inline-flex; align-items:center; gap:6px; justify-content:center; flex-wrap:wrap;">
+                  {% if (p.is_inpatient or p.patient_type == 'Inpatient') and p.status != 'Discharged' and p.room_number
+                  %}
+                  <button type="button" class="btn-action-discharge"
+                    onclick="openDischargeModal('{{ p.name }}', '{{ p.patient_name|escape }}', '{{ p.room_number|escape }}', '{{ p.admission_date or '' }}', '{{ p.ward_type or '' }}', {{ p.room_rate or 1000 }})">
+                    🚪 Discharge
+                  </button>
+                  {% elif (p.is_inpatient or p.patient_type == 'Inpatient') and p.status == 'Discharged' %}
+                  <button type="button" class="btn-action-admit"
+                    onclick="openAdmitModal('{{ p.name }}', '{{ p.patient_name|escape }}')">
+                    🏥 Re-Admit
+                  </button>
+                  {% else %}
+                  <button type="button" class="btn-action-admit"
+                    onclick="openAdmitModal('{{ p.name }}', '{{ p.patient_name|escape }}')">
+                    🏥 Admit
+                  </button>
+                  {% endif %}
+                  <a href="/patient_dashboard?patient={{ p.name|urlencode }}" class="btn-action-portal"
+                    title="Open {{ p.patient_name }}'s portal">
+                    <span>🧑</span> Portal &rarr;
+                  </a>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr class="empty-row" id="noPatientsRow">
+              <td colspan="10">No patient records registered.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 3: PHARMACY & MEDICINE DISPENSING -->
+    <section class="tab-pane" id="pane-pharmacy">
+      <div class="panel-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="searchPrescriptions"
+            placeholder="Search by prescription ID, patient, or doctor…" oninput="filterPrescriptions()">
+        </div>
+        <div class="filter-chips">
+          <button type="button" class="filter-chip active" onclick="filterRxStatus('all', this)">All ({{
+            prescriptions|length }})</button>
+          <button type="button" class="filter-chip" onclick="filterRxStatus('pending', this)">Pending ({{
+            metrics.pending_prescriptions }})</button>
+          <button type="button" class="filter-chip" onclick="filterRxStatus('dispensed', this)">Dispensed ({{
+            metrics.dispensed_prescriptions }})</button>
+        </div>
+        <a href="/pharmacy_dashboard" class="btn-launch-portal rx-btn">
+          <span>💊</span> Open Pharmacy Dispense Desk &rarr;
+        </a>
+      </div>
+
+      <div class="table-card">
+        <table class="data-table" id="prescriptionsTable">
+          <thead>
+            <tr>
+              <th>Prescription ID</th>
+              <th>Patient</th>
+              <th>Prescribing Doctor</th>
+              <th>Prescription Date</th>
+              <th>Authorization</th>
+              <th>Dispense Status</th>
+              <th>Slip View</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rx in prescriptions %}
+            <tr class="rx-row" data-id="{{ rx.name|lower }}" data-patient="{{ rx.patient|lower }}"
+              data-doctor="{{ rx.doctor|lower }}" data-status="{{ (rx.dispense_status or 'Pending')|lower }}">
+              <td><span class="id-tag">{{ rx.name }}</span></td>
+              <td style="font-weight:600; color:#fff;">{{ rx.patient }}</td>
+              <td>{{ rx.doctor }}</td>
+              <td style="color:var(--text-dim);">{{ rx.prescription_date or rx.creation[:10] }}</td>
+              <td>
+                {% if rx.authorization_status == 'Authorized' %}
+                <span class="badge-status authorized">✓ Authorized</span>
+                {% else %}
+                <span class="badge-status draft">○ {{ rx.authorization_status or 'Draft' }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if rx.dispense_status == 'Dispensed' %}
+                <span class="badge-status dispensed">● Dispensed</span>
+                {% else %}
+                <span class="badge-status pending">⏳ {{ rx.dispense_status or 'Pending' }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="/prescription_slip?name={{ rx.name }}" target="_blank"
+                  style="color:var(--primary); font-size:12px; font-weight:600; text-decoration:none;">
+                  View Slip ↗
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr class="empty-row">
+              <td colspan="7">No prescriptions logged in system.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 4: HOSPITAL INVOICES & BILLING -->
+    <section class="tab-pane" id="pane-billing">
+      <div class="panel-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="searchInvoices"
+            placeholder="Search invoice by ID, patient, or doctor…" oninput="filterInvoices()">
+        </div>
+        <div class="filter-chips">
+          <button type="button" class="filter-chip active" onclick="filterInvoiceStatus('all', this)">All ({{
+            invoices|length }})</button>
+          <button type="button" class="filter-chip" onclick="filterInvoiceStatus('paid', this)">Paid</button>
+          <button type="button" class="filter-chip" onclick="filterInvoiceStatus('unpaid', this)">Unpaid</button>
+          <button type="button" class="filter-chip"
+            onclick="filterInvoiceStatus('partially paid', this)">Partial</button>
+        </div>
+        <a href="/billing" class="btn-launch-portal bill-btn">
+          <span>💳</span> Open Billing & Cashier Desk &rarr;
+        </a>
+      </div>
+
+      <div class="table-card">
+        <table class="data-table" id="invoicesTable">
+          <thead>
+            <tr>
+              <th>Invoice #</th>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Invoice Date</th>
+              <th>Grand Total</th>
+              <th>Paid Amount</th>
+              <th>Outstanding</th>
+              <th>Payment Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in invoices %}
+            <tr class="invoice-row" data-id="{{ inv.name|lower }}" data-patient="{{ inv.patient|lower }}"
+              data-doctor="{{ (inv.doctor or '')|lower }}" data-status="{{ (inv.payment_status or 'Unpaid')|lower }}">
+              <td><span class="id-tag">{{ inv.name }}</span></td>
+              <td style="font-weight:600; color:#fff;">{{ inv.patient }}</td>
+              <td>{{ inv.doctor or '—' }}</td>
+              <td style="color:var(--text-dim);">{{ inv.invoice_date or inv.creation[:10] }}</td>
+              <td class="fee-text">₹{{ "{:,.2f}".format(inv.grand_total or 0) }}</td>
+              <td style="color:#34d399; font-weight:600;">₹{{ "{:,.2f}".format(inv.paid_amount or 0) }}</td>
+              <td
+                class="{% if (inv.outstanding_amount or 0) > 0 %}outstanding-due{% else %}outstanding-clear{% endif %}">
+                ₹{{ "{:,.2f}".format(inv.outstanding_amount or 0) }}
+              </td>
+              <td>
+                {% if inv.payment_status == 'Paid' %}
+                <span class="badge-status paid">● Paid</span>
+                {% elif inv.payment_status == 'Partially Paid' %}
+                <span class="badge-status partially-paid">◐ Partial</span>
+                {% else %}
+                <span class="badge-status unpaid">○ Unpaid</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr class="empty-row">
+              <td colspan="8">No billing invoices recorded.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    CarePlus Unified Hospital Management System &copy; 2026 &middot; Role-Based Governance Portal &middot; Administrator
+    View
+  </footer>
+
+  <script>
+    // 1. Tab Switching Logic
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+      });
+      document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.toggle('active', pane.id === `pane-${tabId}`);
+      });
+    }
+
+    // 2. Doctor Filter
+    let currentDoctorStatus = 'all';
+    function filterDoctorStatus(status, el) {
+      currentDoctorStatus = status;
+      if (el) {
+        el.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+      }
+      filterDoctors();
+    }
+
+    function filterDoctors() {
+      const q = (document.getElementById('searchDoctors')?.value || '').toLowerCase().trim();
+      document.querySelectorAll('.doctor-row').forEach(row => {
+        const name = row.getAttribute('data-name') || '';
+        const dept = row.getAttribute('data-dept') || '';
+        const spec = row.getAttribute('data-spec') || '';
+        const active = row.getAttribute('data-active') || '0';
+
+        const matchQuery = !q || name.includes(q) || dept.includes(q) || spec.includes(q);
+        const matchStatus = currentDoctorStatus === 'all' || (currentDoctorStatus === 'active' && active === '1');
+
+        row.style.display = (matchQuery && matchStatus) ? '' : 'none';
+      });
+    }
+
+    // 3. Patient Filter (Search + IPD/OPD Pill Filtering)
+    let currentPatientType = 'all'; // 'all', 'opd', 'ipd'
+
+    function filterPatientType(type, el) {
+      currentPatientType = type;
+      if (el) {
+        el.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+      }
+      filterPatients();
+    }
+
+    function filterPatients() {
+      const q = (document.getElementById('searchPatients')?.value || '').toLowerCase().trim();
+      let visibleCount = 0;
+      document.querySelectorAll('.patient-row').forEach(row => {
+        const name = row.getAttribute('data-name') || '';
+        const id = row.getAttribute('data-id') || '';
+        const phone = row.getAttribute('data-phone') || '';
+        const email = row.getAttribute('data-email') || '';
+        const type = (row.getAttribute('data-type') || 'outpatient').toLowerCase();
+
+        const matchQuery = !q || name.includes(q) || id.includes(q) || phone.includes(q) || email.includes(q);
+        let matchType = true;
+        if (currentPatientType === 'opd') {
+          matchType = type.includes('outpatient') || type.includes('opd');
+        } else if (currentPatientType === 'ipd') {
+          matchType = type.includes('inpatient') || type.includes('ipd');
+        }
+
+        const show = matchQuery && matchType;
+        row.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+      });
+      const noRow = document.getElementById('noPatientsRow');
+      if (noRow) {
+        noRow.style.display = visibleCount === 0 ? '' : 'none';
+      }
+    }
+
+    // 4. Prescription Filter
+    let currentRxStatus = 'all';
+    function filterRxStatus(status, el) {
+      currentRxStatus = status;
+      if (el) {
+        el.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+      }
+      filterPrescriptions();
+    }
+
+    function filterPrescriptions() {
+      const q = (document.getElementById('searchPrescriptions')?.value || '').toLowerCase().trim();
+      document.querySelectorAll('.rx-row').forEach(row => {
+        const id = row.getAttribute('data-id') || '';
+        const patient = row.getAttribute('data-patient') || '';
+        const doctor = row.getAttribute('data-doctor') || '';
+        const status = row.getAttribute('data-status') || '';
+
+        const matchQuery = !q || id.includes(q) || patient.includes(q) || doctor.includes(q);
+        let matchStatus = true;
+        if (currentRxStatus === 'pending') matchStatus = status !== 'dispensed';
+        else if (currentRxStatus === 'dispensed') matchStatus = status === 'dispensed';
+
+        row.style.display = (matchQuery && matchStatus) ? '' : 'none';
+      });
+    }
+
+    // 5. Invoice Filter
+    let currentInvoiceStatus = 'all';
+    function filterInvoiceStatus(status, el) {
+      currentInvoiceStatus = status;
+      if (el) {
+        el.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+      }
+      filterInvoices();
+    }
+
+    function filterInvoices() {
+      const q = (document.getElementById('searchInvoices')?.value || '').toLowerCase().trim();
+      document.querySelectorAll('.invoice-row').forEach(row => {
+        const id = row.getAttribute('data-id') || '';
+        const patient = row.getAttribute('data-patient') || '';
+        const doctor = row.getAttribute('data-doctor') || '';
+        const status = row.getAttribute('data-status') || '';
+
+        const matchQuery = !q || id.includes(q) || patient.includes(q) || doctor.includes(q);
+        const matchStatus = currentInvoiceStatus === 'all' || status.includes(currentInvoiceStatus);
+
+        row.style.display = (matchQuery && matchStatus) ? '' : 'none';
+      });
+    }
+
+    // 6. Logout & Confirmation Modal Handlers
+    function openLogoutModal(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      const modal = document.getElementById('logoutModalBackdrop');
+      if (modal) {
+        modal.classList.add('active');
+        setTimeout(() => document.getElementById('btnConfirmSignOut')?.focus(), 50);
+      }
+    }
+
+    function closeLogoutModal() {
+      const modal = document.getElementById('logoutModalBackdrop');
+      if (modal) {
+        modal.classList.remove('active');
+      }
+    }
+
+    function handleLogoutBackdropClick(e) {
+      if (e.target && e.target.id === 'logoutModalBackdrop') {
+        closeLogoutModal();
+      }
+    }
+
+    // Intercept default navbar logout
+    function logout(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      openLogoutModal(e);
+    }
+
+    // Floating Animated Toast Banner (Top)
+    function showTopToast(message = 'Logged out successfully. Redirecting...') {
+      const banner = document.getElementById('topToastBanner');
+      const textEl = document.getElementById('topToastText');
+      if (textEl) textEl.textContent = message;
+      if (banner) {
+        banner.classList.add('active');
+      }
+    }
+
+    // Confirm Sign Out Execution
+    let isSigningOut = false;
+    async function confirmSignOut() {
+      if (isSigningOut) return;
+      isSigningOut = true;
+
+      const btn = document.getElementById('btnConfirmSignOut');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="toast-spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px;"></span><span class="btn-label">Signing Out...</span>';
+      }
+
+      // Close confirmation modal
+      closeLogoutModal();
+
+      // Display floating animated toast banner on top
+      showTopToast('Logged out successfully. Redirecting...');
+
+      // Also trigger bottom toast notification if available
+      if (typeof showToast === 'function') {
+        showToast('Logged out successfully. Redirecting...', 'success');
+      }
+
+      // Call the standard logout API (/api/method/logout) via fetch request
+      try {
+        await fetch('/api/method/logout', {
+          method: 'POST',
+          headers: {
+            'X-Frappe-CSRF-Token': (window.frappe && frappe.csrf_token) || ''
+          }
+        });
+      } catch (err) {
+        console.warn('Standard logout call completed with catch, trying fallback:', err);
+        try {
+          await fetch('/api/method/hospital_management.api.logout', { method: 'POST' });
+        } catch (e) { }
+      }
+
+      // Short delay (~800ms) for the toast notification to display, then redirect
+      setTimeout(() => {
+        window.history.replaceState(null, document.title, '/frontend');
+        window.location.replace('/frontend');
+      }, 800);
+    }
+
+    window.openLogoutModal = openLogoutModal;
+    window.closeLogoutModal = closeLogoutModal;
+    window.confirmSignOut = confirmSignOut;
+    window.logout = logout;
+
+    // Helper to format doctor name cleanly without duplicate Dr.
+    function formatDoctorDisplayName(name) {
+      if (!name) return 'Doctor';
+      let clean = name.trim();
+      while (/^dr\.?\s+/i.test(clean)) {
+        clean = clean.replace(/^dr\.?\s+/i, '').trim();
+      }
+      return clean ? 'Dr. ' + clean : 'Doctor';
+    }
+
+    // Modal Controls
+    function openAddDoctorModal() {
+      const modal = document.getElementById('addDoctorModalBackdrop');
+      if (modal) {
+        modal.classList.add('active');
+        document.getElementById('modalAlert').style.display = 'none';
+        setTimeout(() => document.getElementById('docNameInput')?.focus(), 50);
+      }
+    }
+
+    function closeAddDoctorModal() {
+      const modal = document.getElementById('addDoctorModalBackdrop');
+      if (modal) {
+        modal.classList.remove('active');
+        document.getElementById('addDoctorForm').reset();
+        document.getElementById('modalAlert').style.display = 'none';
+      }
+    }
+
+    function handleBackdropClick(e) {
+      if (e.target && e.target.id === 'addDoctorModalBackdrop') {
+        closeAddDoctorModal();
+      }
+    }
+
+    window.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        closeAddDoctorModal();
+        closeAddPatientModal();
+        closeLogoutModal();
+      }
+    });
+
+    // Toast Notification helper
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `<span class="t-icon">${type === 'success' ? '✓' : '⚠️'}</span><span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Override native alert & confirm across Admin Portal
+    window.alert = function (msg) {
+      showToast(typeof msg === 'object' ? JSON.stringify(msg) : String(msg), 'error');
+    };
+    window.confirm = function (msg) {
+      return false;
+    };
+
+    // Interactive Status Toggle
+    async function toggleDoctorStatus(docName, btn) {
+      if (!docName || !btn) return;
+      const currentActive = btn.getAttribute('data-active') === '1';
+      const targetActive = currentActive ? 0 : 1;
+
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+
+      try {
+        const resp = await fetch('/api/method/hospital_management.api.toggle_doctor_status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Frappe-CSRF-Token': (window.frappe && frappe.csrf_token) || ''
+          },
+          body: JSON.stringify({ doctor: docName, is_active: targetActive })
+        });
+
+        const data = await resp.json();
+        const res = data.message || {};
+
+        if (data.exc || res.status === 'error') {
+          throw new Error(res.message || 'Failed to toggle status');
+        }
+
+        const newActive = res.is_active === 1;
+        btn.setAttribute('data-active', newActive ? '1' : '0');
+        btn.className = `badge-status-btn ${newActive ? 'active' : 'inactive'}`;
+        btn.innerHTML = newActive
+          ? `<span class="status-dot">●</span> Active Duty`
+          : `<span class="status-dot">○</span> Inactive / Off Duty`;
+
+        const row = btn.closest('.doctor-row');
+        if (row) {
+          row.setAttribute('data-active', newActive ? '1' : '0');
+        }
+
+        if (res.metrics) {
+          updateDoctorMetricsCounters(res.metrics.active_doctors, res.metrics.total_doctors);
+        }
+
+        filterDoctors();
+        showToast(`Status updated for ${formatDoctorDisplayName(docName)}: ${res.status_label || (newActive ? 'Active Duty' : 'Inactive')}`);
+      } catch (err) {
+        console.error('Error toggling doctor status:', err);
+        showToast(err.message || 'Error updating status', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }
+    }
+
+    function updateDoctorMetricsCounters(activeCount, totalCount) {
+      const activeEl = document.getElementById('metricActiveDoctors');
+      if (activeEl && activeCount != null) activeEl.textContent = activeCount;
+
+      const totalEl = document.getElementById('metricTotalDoctors');
+      if (totalEl && totalCount != null) totalEl.textContent = totalCount;
+
+      const badgeDoc = document.getElementById('badgeDoctorCount');
+      if (badgeDoc && totalCount != null) badgeDoc.textContent = totalCount;
+
+      const chipAll = document.getElementById('chipDoctorAll');
+      if (chipAll && totalCount != null) chipAll.textContent = `All (${totalCount})`;
+
+      const chipActive = document.getElementById('chipDoctorActive');
+      if (chipActive && activeCount != null) chipActive.textContent = `Active (${activeCount})`;
+    }
+
+    // Submit Create Doctor Form
+    async function handleCreateDoctorSubmit(e) {
+      e.preventDefault();
+      const submitBtn = document.getElementById('btnSubmitNewDoctor');
+      const alertBox = document.getElementById('modalAlert');
+      alertBox.style.display = 'none';
+
+      const doctorName = document.getElementById('docNameInput').value.trim();
+      const department = document.getElementById('docDeptSelect').value;
+      const specialization = document.getElementById('docSpecSelect').value;
+      const phone = document.getElementById('docPhoneInput').value.trim();
+      const email = document.getElementById('docEmailInput').value.trim();
+      const consultationFee = parseFloat(document.getElementById('docFeeInput').value) || 0;
+      const shiftSchedule = document.getElementById('docShiftSelect').value;
+      const status = document.getElementById('docStatusSelect').value;
+
+      if (!doctorName) {
+        alertBox.className = 'modal-alert error';
+        alertBox.textContent = 'Please provide a doctor name.';
+        alertBox.style.display = 'block';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span style="display:inline-block; width:14px; height:14px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite; margin-right:6px;"></span> Creating...`;
+
+      try {
+        const resp = await fetch('/api/method/hospital_management.api.create_doctor', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Frappe-CSRF-Token': (window.frappe && frappe.csrf_token) || ''
+          },
+          body: JSON.stringify({
+            doctor_name: doctorName,
+            department: department,
+            specialization: specialization,
+            phone: phone,
+            email: email,
+            consultation_fee: consultationFee,
+            shift_schedule: shiftSchedule,
+            status: status
+          })
+        });
+
+        const data = await resp.json();
+        const res = data.message || {};
+
+        if (data.exc || res.status === 'error') {
+          throw new Error(res.message || 'Failed to create doctor');
+        }
+
+        const doc = res.doctor;
+        closeAddDoctorModal();
+        showToast(res.message || `Doctor ${doc.formatted_name} created successfully!`);
+
+        await refreshDoctorTable(doc.name);
+
+        if (res.metrics) {
+          updateDoctorMetricsCounters(res.metrics.active_doctors, res.metrics.total_doctors);
+        }
+      } catch (err) {
+        console.error('Error creating doctor:', err);
+        alertBox.className = 'modal-alert error';
+        alertBox.textContent = err.message || 'Error creating doctor record.';
+        alertBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<span class="btn-icon">✓</span> <span class="btn-label">Create Doctor Record</span>`;
+      }
+    }
+
+    // Refresh Doctor Table dynamically
+    async function refreshDoctorTable(highlightDocName = null) {
+      try {
+        const resp = await fetch('/api/method/hospital_management.api.get_doctors_table_data');
+        const data = await resp.json();
+        const res = data.message || {};
+        if (res.status === 'success' && Array.isArray(res.doctors)) {
+          renderDoctorsTable(res.doctors, highlightDocName);
+          if (res.metrics) {
+            updateDoctorMetricsCounters(res.metrics.active_doctors, res.metrics.total_doctors);
+          }
+        }
+      } catch (err) {
+        console.error('Error refreshing doctors table:', err);
+      }
+    }
+
+    function renderDoctorsTable(doctors, highlightDocName = null) {
+      const tbody = document.getElementById('doctorsTableBody');
+      if (!tbody) return;
+
+      if (!doctors || doctors.length === 0) {
+        tbody.innerHTML = `<tr class="empty-row" id="noDoctorsRow"><td colspan="8">No doctor records registered.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = doctors.map(doc => {
+        const displayName = formatDoctorDisplayName(doc.formatted_name || doc.doctor_name);
+        const isActive = doc.is_active == 1;
+        const feeFormatted = (doc.consultation_fee || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const shiftDisplay = (doc.shift_start_time && doc.shift_end_time)
+          ? `<span style="font-size:12px; color:var(--text-dim);">${doc.shift_start_time} - ${doc.shift_end_time}</span>`
+          : `<span style="font-size:12px; color:var(--text-dark);">Standard Shift</span>`;
+        const isHighlight = highlightDocName && (doc.name === highlightDocName || doc.doctor_name === highlightDocName);
+
+        return `
+          <tr class="doctor-row ${isHighlight ? 'row-highlight' : ''}" 
+              data-docname="${escapeHtml(doc.name)}" 
+              data-name="${escapeHtml(displayName.toLowerCase())}" 
+              data-dept="${escapeHtml((doc.department || '').toLowerCase())}" 
+              data-spec="${escapeHtml((doc.specialization || '').toLowerCase())}" 
+              data-active="${isActive ? '1' : '0'}">
+            <td>
+              <div style="font-weight:700; color:#fff;" class="doc-display-name">${escapeHtml(displayName)}</div>
+              <span class="id-tag">${escapeHtml(doc.name)}</span>
+            </td>
+            <td>${escapeHtml(doc.department || 'General')}</td>
+            <td>${escapeHtml(doc.specialization || 'General Practitioner')}</td>
+            <td>${escapeHtml(doc.phone || '—')}</td>
+            <td class="fee-text">₹${feeFormatted}</td>
+            <td>${shiftDisplay}</td>
+            <td style="text-align:center;">
+              <button type="button" 
+                class="badge-status-btn ${isActive ? 'active' : 'inactive'}" 
+                onclick="toggleDoctorStatus('${escapeHtml(doc.name)}', this)"
+                data-active="${isActive ? '1' : '0'}"
+                title="Click to toggle status: Active Duty / Off Duty">
+                ${isActive ? '<span class="status-dot">●</span> Active Duty' : '<span class="status-dot">○</span> Inactive / Off Duty'}
+              </button>
+            </td>
+            <td style="text-align:center;">
+              <a href="/doctor_dashboard?doctor=${encodeURIComponent(doc.name)}" class="btn-action-desk" title="Open ${escapeHtml(displayName)}'s clinical desk">
+                <span>🩺</span> View Desk &rarr;
+              </a>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      filterDoctors();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+
+    // Patient Modal Controls
+    function openAddPatientModal() {
+      const modal = document.getElementById('addPatientModalBackdrop');
+      if (modal) {
+        modal.classList.add('active');
+        document.getElementById('patientModalAlert').style.display = 'none';
+        setTimeout(() => document.getElementById('patNameInput')?.focus(), 50);
+      }
+    }
+
+    function closeAddPatientModal() {
+      const modal = document.getElementById('addPatientModalBackdrop');
+      if (modal) {
+        modal.classList.remove('active');
+        document.getElementById('addPatientForm').reset();
+        document.getElementById('patientModalAlert').style.display = 'none';
+      }
+    }
+
+    function handlePatientBackdropClick(e) {
+      if (e.target && e.target.id === 'addPatientModalBackdrop') {
+        closeAddPatientModal();
+      }
+    }
+
+    function togglePatientRoomFields(val) {
+      const isInpatient = (val === 'Inpatient');
+      const ipdGroup = document.getElementById('patIpdDetailsGroup');
+      const admGroup = document.getElementById('patAdmDateGroup');
+
+      if (ipdGroup) ipdGroup.style.display = isInpatient ? 'grid' : 'none';
+      if (admGroup) {
+        admGroup.style.display = isInpatient ? 'block' : 'none';
+        const admInput = document.getElementById('patAdmDateInput');
+        if (isInpatient && admInput && !admInput.value) {
+          admInput.value = new Date().toISOString().split('T')[0];
+        }
+      }
+
+      if (isInpatient) {
+        const ward = document.getElementById('patWardSelect')?.value || 'General Ward';
+        loadAvailableRoomsForAddModal(ward);
+      }
+    }
+
+    async function loadAvailableRoomsForAddModal(ward) {
+      const roomSelect = document.getElementById('patRoomSelect');
+      const hint = document.getElementById('patRoomHint');
+      if (!roomSelect) return;
+
+      roomSelect.innerHTML = '<option value="">Loading available beds...</option>';
+      try {
+        const resp = await fetch(`/api/method/hospital_management.api.get_available_rooms?ward_type=${encodeURIComponent(ward)}`);
+        const json = await resp.json();
+        const rooms = (json.message && json.message.available_rooms) || [];
+
+        if (rooms.length === 0) {
+          roomSelect.innerHTML = '<option value="">No beds currently available in this ward</option>';
+          if (hint) hint.textContent = `All beds in ${ward} are currently occupied.`;
+        } else {
+          roomSelect.innerHTML = '<option value="">-- Choose Available Bed --</option>' +
+            rooms.map(r => `<option value="${escapeHtml(r.room_no)}">${escapeHtml(r.room_no)} (₹${parseFloat(r.rate).toLocaleString('en-IN')}/day)</option>`).join('');
+          if (hint) hint.textContent = `${rooms.length} beds available in ${ward} (occupied beds filtered out).`;
+        }
+      } catch (e) {
+        console.error('Error loading rooms for add modal:', e);
+        roomSelect.innerHTML = '<option value="">Error loading available beds</option>';
+      }
+    }
+
+    // Submit Create Patient Form
+    async function handleCreatePatientSubmit(e) {
+      e.preventDefault();
+      const submitBtn = document.getElementById('btnSubmitNewPatient');
+      const alertBox = document.getElementById('patientModalAlert');
+      alertBox.style.display = 'none';
+
+      const patientName = document.getElementById('patNameInput').value.trim();
+      const gender = document.getElementById('patGenderSelect').value;
+      const bloodGroup = document.getElementById('patBloodSelect').value;
+      const phone = document.getElementById('patPhoneInput').value.trim();
+      const dob = document.getElementById('patDobInput').value;
+      const email = document.getElementById('patEmailInput').value.trim();
+      const patientType = document.getElementById('patTypeSelect')?.value || 'Outpatient';
+      const wardType = (patientType === 'Inpatient') ? (document.getElementById('patWardSelect')?.value || 'General Ward') : '';
+      const roomNumber = (patientType === 'Inpatient') ? (document.getElementById('patRoomSelect')?.value || '') : '';
+      const admissionDate = (patientType === 'Inpatient') ? (document.getElementById('patAdmDateInput')?.value || '') : '';
+
+      if (!patientName) {
+        alertBox.className = 'modal-alert error';
+        alertBox.textContent = 'Please provide full patient name.';
+        alertBox.style.display = 'block';
+        return;
+      }
+
+      if (patientType === 'Inpatient' && !roomNumber) {
+        alertBox.className = 'modal-alert error';
+        alertBox.textContent = 'Please choose an available Room / Bed for Inpatient admission.';
+        alertBox.style.display = 'block';
+        return;
+      }
+
+      if (!email) {
+        alertBox.className = 'modal-alert error';
+        alertBox.textContent = 'Please provide an email address for portal access.';
+        alertBox.style.display = 'block';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span style="display:inline-block; width:14px; height:14px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite; margin-right:6px;"></span> Registering...`;
+
+      try {
+        const resp = await fetch('/api/method/hospital_management.api.create_patient', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Frappe-CSRF-Token': (window.frappe && frappe.csrf_token) || ''
+          },
+          body: JSON.stringify({
+            patient_name: patientName,
+            gender: gender,
+            blood_group: bloodGroup,
+            phone: phone,
+            date_of_birth: dob,
+            email: email,
+            patient_type: patientType,
+            ward_type: wardType,
+            room_number: roomNumber,
+            admission_date: admissionDate,
+            status: 'Active'
+          })
+        });
+
+        const data = await resp.json();
+        const res = data.message || {};
+
+        if (data.exc || res.status === 'error') {
+          throw new Error(res.message || 'Failed to create patient');
+        }
+
+        const patient = res.patient;
+        closeAddPatientModal();
+        showToast(res.message || `Patient ${patient.patient_name} registered successfully!`);
+
+        await refreshPatientsTable(patient.name);
+
+        if (res.metrics && res.metrics.total_patients != null) {
+          updatePatientMetricsCounters(
+            res.metrics.total_patients,
+            res.metrics.ipd_patients,
+            res.metrics.opd_patients
+          );
+        }
+      } catch (err) {
+        console.error('Error creating patient:', err);
+        alertBox.className = 'modal-alert error';
+        alertBox.textContent = err.message || 'Error creating patient record.';
+        alertBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<span class="btn-icon">✓</span> <span class="btn-label">Register Patient Record</span>`;
+      }
+    }
+
+    function updatePatientMetricsCounters(totalPatients, ipdCount = null, opdCount = null) {
+      const metricEl = document.getElementById('metricTotalPatients');
+      if (metricEl && totalPatients != null) metricEl.textContent = totalPatients;
+
+      const badgeEl = document.getElementById('badgePatientCount');
+      if (badgeEl && totalPatients != null) badgeEl.textContent = totalPatients;
+
+      const countAll = document.getElementById('countPatientAll');
+      if (countAll && totalPatients != null) countAll.textContent = totalPatients;
+
+      const countOPD = document.getElementById('countPatientOPD');
+      if (countOPD && opdCount != null) countOPD.textContent = opdCount;
+
+      const countIPD = document.getElementById('countPatientIPD');
+      if (countIPD && ipdCount != null) countIPD.textContent = ipdCount;
+
+      const summaryEl = document.getElementById('metricOpdIpdSummary');
+      if (summaryEl && opdCount != null && ipdCount != null) {
+        summaryEl.textContent = `${opdCount} OPD · ${ipdCount} IPD`;
+      }
+    }
+
+    async function refreshPatientsTable(highlightPatientName = null) {
+      try {
+        const resp = await fetch('/api/method/hospital_management.api.get_patients_table_data');
+        const data = await resp.json();
+        const res = data.message || {};
+        if (res.status === 'success' && Array.isArray(res.patients)) {
+          renderPatientsTable(res.patients, highlightPatientName);
+          if (res.metrics) {
+            updatePatientMetricsCounters(
+              res.metrics.total_patients,
+              res.metrics.ipd_patients,
+              res.metrics.opd_patients
+            );
+          }
+        }
+      } catch (err) {
+        console.error('Error refreshing patients table:', err);
+      }
+    }
+
+    function renderPatientsTable(patients, highlightPatientName = null) {
+      const tbody = document.getElementById('patientsTableBody');
+      if (!tbody) return;
+
+      if (!patients || patients.length === 0) {
+        tbody.innerHTML = `<tr class="empty-row" id="noPatientsRow"><td colspan="10">No patient records registered.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = patients.map(p => {
+        const isHighlight = highlightPatientName && (p.name === highlightPatientName || p.patient_name === highlightPatientName);
+        const bloodHtml = p.blood_group
+          ? `<span style="display:inline-block; font-weight:700; color:#f43f5e; background:rgba(244,63,94,0.12); padding:1px 7px; border-radius:5px; border:1px solid rgba(244,63,94,0.25);">${escapeHtml(p.blood_group)}</span>`
+          : `<span style="color:var(--text-dark);">—</span>`;
+
+        const isDischarged = (p.status === 'Discharged');
+        const isInpatient = (p.patient_type === 'Inpatient' || p.is_inpatient);
+        const typeBadgeHtml = isInpatient
+          ? `<span class="badge-type-ipd">🏥 Inpatient (IPD)</span>`
+          : `<span class="badge-type-opd">🚶 Outpatient (OPD)</span>`;
+
+        let roomBadgeHtml = `<span style="color:var(--text-dark); font-size:12px;">N/A (OPD)</span>`;
+        if (isInpatient) {
+          if (p.room_number && !isDischarged) {
+            roomBadgeHtml = `<span class="badge-room" title="Ward: ${escapeHtml(p.ward_type || 'General Ward')} · Rate: ₹${parseFloat(p.room_rate || 1000).toLocaleString('en-IN')}/day">🛏️ ${escapeHtml(p.room_number)}</span>`;
+          } else if (isDischarged) {
+            roomBadgeHtml = `<span class="badge-room discharged" title="Discharged on ${escapeHtml(p.discharge_date || 'Recent')}">🚪 Discharged</span>`;
+          } else {
+            roomBadgeHtml = `<span class="badge-room pending" title="Inpatient room assignment pending">⚠️ Room Pending</span>`;
+          }
+        }
+
+        let actionButtonsHtml = '';
+        if (isInpatient && !isDischarged && p.room_number) {
+          actionButtonsHtml = `<button type="button" class="btn-action-discharge" onclick="openDischargeModal('${escapeHtml(p.name)}', '${escapeHtml(p.patient_name || p.name)}', '${escapeHtml(p.room_number)}', '${escapeHtml(p.admission_date || '')}', '${escapeHtml(p.ward_type || '')}', ${p.room_rate || 1000})">🚪 Discharge</button>`;
+        } else if (isInpatient && isDischarged) {
+          actionButtonsHtml = `<button type="button" class="btn-action-admit" onclick="openAdmitModal('${escapeHtml(p.name)}', '${escapeHtml(p.patient_name || p.name)}')">🏥 Re-Admit</button>`;
+        } else {
+          actionButtonsHtml = `<button type="button" class="btn-action-admit" onclick="openAdmitModal('${escapeHtml(p.name)}', '${escapeHtml(p.patient_name || p.name)}')">🏥 Admit</button>`;
+        }
+
+        const typeDataAttr = isInpatient ? 'inpatient' : 'outpatient';
+
+        return `
+          <tr class="patient-row ${isHighlight ? 'row-highlight' : ''}"
+              data-id="${escapeHtml((p.name || '').toLowerCase())}"
+              data-name="${escapeHtml((p.patient_name || '').toLowerCase())}"
+              data-phone="${escapeHtml((p.phone || '').toLowerCase())}"
+              data-email="${escapeHtml((p.email || '').toLowerCase())}"
+              data-type="${typeDataAttr}">
+            <td>
+              <a href="/patient_dashboard?patient=${encodeURIComponent(p.name)}" class="id-tag patient-link" title="Open ${escapeHtml(p.patient_name)}'s portal">
+                ${escapeHtml(p.name)}
+              </a>
+            </td>
+            <td>
+              <a href="/patient_dashboard?patient=${encodeURIComponent(p.name)}" class="patient-name-link" title="Open ${escapeHtml(p.patient_name)}'s portal">
+                ${escapeHtml(p.patient_name)}
+              </a>
+            </td>
+            <td>${escapeHtml(p.gender || '—')}</td>
+            <td>${typeBadgeHtml}</td>
+            <td>${roomBadgeHtml}</td>
+            <td>${escapeHtml(p.phone || '—')}</td>
+            <td>${escapeHtml(p.email || '—')}</td>
+            <td>${bloodHtml}</td>
+            <td style="color:var(--text-dim);">${escapeHtml(p.date_of_birth || '—')}</td>
+            <td style="text-align:center;">
+              <div style="display:inline-flex; align-items:center; gap:6px; justify-content:center; flex-wrap:wrap;">
+                ${actionButtonsHtml}
+                <a href="/patient_dashboard?patient=${encodeURIComponent(p.name)}" class="btn-action-portal" title="Open ${escapeHtml(p.patient_name)}'s portal">
+                  <span>🧑</span> Portal &rarr;
+                </a>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      filterPatients();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // ADMIT / ASSIGN ROOM & DISCHARGE MODAL LOGIC
+    // ─────────────────────────────────────────────────────────────
+    let dischargeContext = {};
+
+    function openAdmitModal(patientId, patientName) {
+      const modal = document.getElementById('admitPatientModalBackdrop');
+      if (!modal) return;
+
+      document.getElementById('admitPatientIdInput').value = patientId;
+      document.getElementById('admitPatientNameDisplay').textContent = patientName;
+      document.getElementById('admitDateInput').value = new Date().toISOString().split('T')[0];
+      document.getElementById('admitModalAlert').style.display = 'none';
+
+      const wardSelect = document.getElementById('admitWardSelect');
+      if (wardSelect) {
+        wardSelect.selectedIndex = 0;
+        loadAvailableRoomsForAdmit(wardSelect.value);
+      }
+
+      modal.classList.add('active');
+    }
+
+    function closeAdmitModal() {
+      const modal = document.getElementById('admitPatientModalBackdrop');
+      if (modal) {
+        modal.classList.remove('active');
+        document.getElementById('admitPatientForm').reset();
+        document.getElementById('admitModalAlert').style.display = 'none';
+      }
+    }
+
+    function handleAdmitBackdropClick(e) {
+      if (e.target && e.target.id === 'admitPatientModalBackdrop') {
+        closeAdmitModal();
+      }
+    }
+
+    async function loadAvailableRoomsForAdmit(ward) {
+      const roomSelect = document.getElementById('admitRoomSelect');
+      const hint = document.getElementById('admitRoomHint');
+      if (!roomSelect) return;
+
+      roomSelect.innerHTML = '<option value="">Loading available beds...</option>';
+      try {
+        const resp = await fetch(`/api/method/hospital_management.api.get_available_rooms?ward_type=${encodeURIComponent(ward)}`);
+        const json = await resp.json();
+        const rooms = (json.message && json.message.available_rooms) || [];
+
+        if (rooms.length === 0) {
+          roomSelect.innerHTML = '<option value="">No beds currently available in this ward</option>';
+          if (hint) hint.textContent = `All beds in ${ward} are currently occupied.`;
+        } else {
+          roomSelect.innerHTML = '<option value="">-- Choose Available Bed --</option>' +
+            rooms.map(r => `<option value="${escapeHtml(r.room_no)}">${escapeHtml(r.room_no)} (₹${parseFloat(r.rate).toLocaleString('en-IN')}/day)</option>`).join('');
+          if (hint) hint.textContent = `${rooms.length} beds available in ${ward} (occupied beds filtered out).`;
+        }
+      } catch (e) {
+        console.error('Error loading available rooms:', e);
+        roomSelect.innerHTML = '<option value="">Error loading beds</option>';
+      }
+    }
+
+    async function handleAdmitPatientSubmit(e) {
+      e.preventDefault();
+      const patientId = document.getElementById('admitPatientIdInput').value;
+      const ward = document.getElementById('admitWardSelect').value;
+      const room = document.getElementById('admitRoomSelect').value;
+      const admDate = document.getElementById('admitDateInput').value;
+      const alertBox = document.getElementById('admitModalAlert');
+      const submitBtn = document.getElementById('btnSubmitAdmit');
+
+      if (!room) {
+        alertBox.className = 'modal-alert error';
+        alertBox.textContent = 'Please choose an available bed to assign.';
+        alertBox.style.display = 'block';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span style="display:inline-block; width:14px; height:14px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite; margin-right:6px;"></span> Admitting...`;
+
+      try {
+        const resp = await fetch('/api/method/hospital_management.api.admit_patient', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Frappe-CSRF-Token': (window.frappe && frappe.csrf_token) || ''
+          },
+          body: JSON.stringify({
+            patient_id: patientId,
+            room_number: room,
+            ward_type: ward,
+            admission_date: admDate
+          })
+        });
+
+        const data = await resp.json();
+        const res = data.message || {};
+
+        if (data.exc || res.status === 'error') {
+          throw new Error(res.message || 'Failed to admit patient');
+        }
+
+        closeAdmitModal();
+        showToast(res.message || `Patient successfully admitted to ${room}!`);
+        await refreshPatientsTable(patientId);
+
+        if (res.metrics && res.metrics.total_patients != null) {
+          updatePatientMetricsCounters(
+            res.metrics.total_patients,
+            res.metrics.ipd_patients,
+            res.metrics.opd_patients
+          );
+        }
+      } catch (err) {
+        alertBox.className = 'modal-alert error';
+        alertBox.textContent = err.message || 'Error admitting patient.';
+        alertBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<span class="btn-icon">✓</span> <span class="btn-label">Confirm Inpatient Admission</span>`;
+      }
+    }
+
+    function openDischargeModal(patientId, patientName, roomNumber, admissionDate, wardType, roomRate) {
+      const modal = document.getElementById('dischargePatientModalBackdrop');
+      if (!modal) return;
+
+      dischargeContext = {
+        patientId,
+        patientName,
+        roomNumber: roomNumber || 'Assigned Room',
+        admissionDate: admissionDate || new Date().toISOString().split('T')[0],
+        wardType: wardType || 'General Ward',
+        roomRate: parseFloat(roomRate || 1000)
+      };
+
+      document.getElementById('dischargePatientIdInput').value = patientId;
+      document.getElementById('dischargePatientName').textContent = patientName;
+      document.getElementById('dischargeRoomBadge').textContent = `🛏️ ${dischargeContext.roomNumber} (${dischargeContext.wardType})`;
+      document.getElementById('dischargeAdmDate').textContent = dischargeContext.admissionDate;
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const disInput = document.getElementById('dischargeDateInput');
+      disInput.value = todayStr;
+      disInput.min = dischargeContext.admissionDate;
+
+      recalculateDischargeStay();
+      document.getElementById('dischargeModalAlert').style.display = 'none';
+
+      modal.classList.add('active');
+    }
+
+    function recalculateDischargeStay() {
+      const disDateVal = document.getElementById('dischargeDateInput')?.value || new Date().toISOString().split('T')[0];
+      const admDateVal = dischargeContext.admissionDate || disDateVal;
+
+      const d1 = new Date(admDateVal);
+      const d2 = new Date(disDateVal);
+      const diffTime = d2.getTime() - d1.getTime();
+      const diffDays = Math.max(1, Math.round(diffTime / (1000 * 3600 * 24)));
+
+      const rate = dischargeContext.roomRate || 1000;
+      const charges = diffDays * rate;
+
+      const stayEl = document.getElementById('dischargeDaysStay');
+      if (stayEl) stayEl.textContent = `${diffDays} Day${diffDays > 1 ? 's' : ''} (@ ₹${rate.toLocaleString('en-IN')}/day)`;
+
+      const chargesEl = document.getElementById('dischargeEstimatedCharges');
+      if (chargesEl) chargesEl.textContent = `₹${charges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    }
+
+    function closeDischargeModal() {
+      const modal = document.getElementById('dischargePatientModalBackdrop');
+      if (modal) {
+        modal.classList.remove('active');
+        document.getElementById('dischargePatientForm').reset();
+        document.getElementById('dischargeModalAlert').style.display = 'none';
+      }
+    }
+
+    function handleDischargeBackdropClick(e) {
+      if (e.target && e.target.id === 'dischargePatientModalBackdrop') {
+        closeDischargeModal();
+      }
+    }
+
+    async function handleDischargePatientSubmit(e) {
+      e.preventDefault();
+      const patientId = document.getElementById('dischargePatientIdInput').value;
+      const dischargeDate = document.getElementById('dischargeDateInput').value;
+      const alertBox = document.getElementById('dischargeModalAlert');
+      const submitBtn = document.getElementById('btnSubmitDischarge');
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span style="display:inline-block; width:14px; height:14px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite; margin-right:6px;"></span> Discharging...`;
+
+      try {
+        const resp = await fetch('/api/method/hospital_management.api.discharge_patient', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Frappe-CSRF-Token': (window.frappe && frappe.csrf_token) || ''
+          },
+          body: JSON.stringify({
+            patient_id: patientId,
+            discharge_date: dischargeDate
+          })
+        });
+
+        const data = await resp.json();
+        const res = data.message || {};
+
+        if (data.exc || res.status === 'error') {
+          throw new Error(res.message || 'Failed to discharge patient');
+        }
+
+        closeDischargeModal();
+        const summary = res.discharge_summary || {};
+        const chargesFormatted = parseFloat(summary.estimated_room_charges || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        showToast(`Patient ${dischargeContext.patientName} discharged! Room ${dischargeContext.roomNumber} released. Stay Charges: ₹${chargesFormatted}. Ready for billing!`);
+
+        await refreshPatientsTable(patientId);
+
+        if (res.metrics && res.metrics.total_patients != null) {
+          updatePatientMetricsCounters(
+            res.metrics.total_patients,
+            res.metrics.ipd_patients,
+            res.metrics.opd_patients
+          );
+        }
+      } catch (err) {
+        alertBox.className = 'modal-alert error';
+        alertBox.textContent = err.message || 'Error discharging patient.';
+        alertBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<span class="btn-icon">✓</span> <span class="btn-label">Confirm Discharge &amp; Release Bed</span>`;
+      }
+    }
+
+  </script>
+
+  <!-- ADD NEW DOCTOR MODAL (Glassmorphism Popup) -->
+  <div class="modal-backdrop" id="addDoctorModalBackdrop" onclick="handleBackdropClick(event)">
+    <div class="modal-card" id="addDoctorModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="modal-icon">🩺</div>
+          <div>
+            <h2 id="modalTitle" class="modal-title">Add New Doctor</h2>
+            <p class="modal-desc">Register a practitioner into CarePlus hospital master database.</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="closeAddDoctorModal()" title="Close (Esc)">✕</button>
+      </div>
+
+      <form id="addDoctorForm" onsubmit="handleCreateDoctorSubmit(event)">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label for="docNameInput">Doctor Name <span class="req">*</span></label>
+              <input type="text" id="docNameInput" class="form-control" placeholder="e.g. Dr. Jane Doe" required
+                autocomplete="off">
+              <small class="form-hint">Prefix "Dr." is formatted cleanly and duplicates are prevented.</small>
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="docDeptSelect">Department</label>
+              <select id="docDeptSelect" class="form-control">
+                <option value="General Medicine">General Medicine</option>
+                {% for dept in departments %}
+                {% if dept.department_name != "General Medicine" and dept.name != "General Medicine" %}
+                <option value="{{ dept.name }}">{{ dept.department_name or dept.name }}</option>
+                {% endif %}
+                {% endfor %}
+                <option value="Cardiology">Cardiology</option>
+                <option value="Neurology">Neurology</option>
+                <option value="Orthopedics">Orthopedics</option>
+                <option value="Pediatrics">Pediatrics</option>
+                <option value="Dermatology">Dermatology</option>
+                <option value="Gynecology">Gynecology</option>
+                <option value="ENT">ENT</option>
+                <option value="Ophthalmology">Ophthalmology</option>
+                <option value="Oncology">Oncology</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="docSpecSelect">Specialization</label>
+              <select id="docSpecSelect" class="form-control">
+                <option value="General Physician">General Physician</option>
+                <option value="Cardiologist">Cardiologist</option>
+                <option value="Neurologist">Neurologist</option>
+                <option value="Orthopedic">Orthopedic</option>
+                <option value="Pediatrician">Pediatrician</option>
+                <option value="Dermatologist">Dermatologist</option>
+                <option value="Gynecologist">Gynecologist</option>
+                <option value="ENT Specialist">ENT Specialist</option>
+                <option value="General Surgeon">General Surgeon</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="docPhoneInput">Phone Number</label>
+              <input type="tel" id="docPhoneInput" class="form-control" placeholder="e.g. +91 98765 43210">
+            </div>
+            <div class="form-group">
+              <label for="docFeeInput">Consultation Fee (INR ₹)</label>
+              <input type="number" id="docFeeInput" class="form-control" placeholder="500" value="500" min="0"
+                step="50">
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="docShiftSelect">Shift Schedule</label>
+              <select id="docShiftSelect" class="form-control">
+                <option value="Regular Day (09:00 - 17:00)">Regular Day (09:00 - 17:00)</option>
+                <option value="Morning Shift (08:00 - 14:00)">Morning Shift (08:00 - 14:00)</option>
+                <option value="Full Day (09:00 - 18:00)">Full Day (09:00 - 18:00)</option>
+                <option value="Evening Shift (14:00 - 20:00)">Evening Shift (14:00 - 20:00)</option>
+                <option value="Night Shift (20:00 - 08:00)">Night Shift (20:00 - 08:00)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="docStatusSelect">Status</label>
+              <select id="docStatusSelect" class="form-control">
+                <option value="Active Duty" selected>Active Duty (Default)</option>
+                <option value="Inactive / Off Duty">Inactive / Off Duty</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label for="docEmailInput">Email Address <span class="opt">(Optional)</span></label>
+              <input type="email" id="docEmailInput" class="form-control" placeholder="e.g. dr.jane@careplus.hospital">
+              <small class="form-hint">Optional. Auto-creates a Doctor login account with default password
+                Doctor@123.</small>
+            </div>
+          </div>
+
+          <div id="modalAlert" class="modal-alert" style="display:none;"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-modal-cancel" onclick="closeAddDoctorModal()">Cancel</button>
+          <button type="submit" class="btn-modal-submit" id="btnSubmitNewDoctor">
+            <span class="btn-icon">✓</span>
+            <span class="btn-label">Create Doctor Record</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD NEW PATIENT MODAL (Glassmorphism Popup) -->
+  <div class="modal-backdrop" id="addPatientModalBackdrop" onclick="handlePatientBackdropClick(event)">
+    <div class="modal-card" id="addPatientModal" role="dialog" aria-modal="true" aria-labelledby="patientModalTitle">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="modal-icon"
+            style="background:linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2)); border:1px solid rgba(16,185,129,0.3); color:#34d399;">
+            🧑</div>
+          <div>
+            <h2 id="patientModalTitle" class="modal-title">Add New Patient</h2>
+            <p class="modal-desc">Register a patient record into CarePlus hospital master database.</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="closeAddPatientModal()" title="Close (Esc)">✕</button>
+      </div>
+
+      <form id="addPatientForm" onsubmit="handleCreatePatientSubmit(event)">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label for="patNameInput">Full Name <span class="req">*</span></label>
+              <input type="text" id="patNameInput" class="form-control" placeholder="e.g. Rahul Sharma" required
+                autocomplete="off">
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="patGenderSelect">Gender <span class="req">*</span></label>
+              <select id="patGenderSelect" class="form-control" required>
+                <option value="Male" selected>Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="patBloodSelect">Blood Group</label>
+              <select id="patBloodSelect" class="form-control">
+                <option value="">-- Select Blood Group --</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+" selected>O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="patPhoneInput">Contact Phone</label>
+              <input type="tel" id="patPhoneInput" class="form-control" placeholder="e.g. +91 98765 43210">
+            </div>
+            <div class="form-group">
+              <label for="patDobInput">Date of Birth</label>
+              <input type="date" id="patDobInput" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="patTypeSelect">Patient Type <span class="req">*</span></label>
+              <select id="patTypeSelect" class="form-control" onchange="togglePatientRoomFields(this.value)">
+                <option value="Outpatient" selected>Outpatient (OPD)</option>
+                <option value="Inpatient">Inpatient (IPD / Admitted)</option>
+              </select>
+            </div>
+            <div class="form-group" id="patAdmDateGroup" style="display:none;">
+              <label for="patAdmDateInput">Admission Date</label>
+              <input type="date" id="patAdmDateInput" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-row two-col" id="patIpdDetailsGroup" style="display:none;">
+            <div class="form-group">
+              <label for="patWardSelect">Ward / Room Type <span class="req">*</span></label>
+              <select id="patWardSelect" class="form-control" onchange="loadAvailableRoomsForAddModal(this.value)">
+                <option value="General Ward" selected>General Ward (₹1,000 / day)</option>
+                <option value="Semi-Private">Semi-Private (₹1,800 / day)</option>
+                <option value="Deluxe">Deluxe (₹2,500 / day)</option>
+                <option value="ICU">ICU (₹3,500 / day)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="patRoomSelect">Available Room / Bed Number <span class="req">*</span></label>
+              <select id="patRoomSelect" class="form-control">
+                <option value="">-- Choose Available Bed --</option>
+              </select>
+              <small class="form-hint" id="patRoomHint"
+                style="display:block; margin-top:4px; font-size:11px; color:var(--text-muted);">Occupied beds are
+                filtered out automatically.</small>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label for="patEmailInput">Email Address <span class="req">*</span></label>
+              <input type="email" id="patEmailInput" class="form-control" placeholder="e.g. rahul.sharma@example.com"
+                required>
+              <small class="form-hint">Auto-creates a Patient portal login account with default password
+                Patient@123.</small>
+            </div>
+          </div>
+
+          <div id="patientModalAlert" class="modal-alert" style="display:none;"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-modal-cancel" onclick="closeAddPatientModal()">Cancel</button>
+          <button type="submit" class="btn-modal-submit" id="btnSubmitNewPatient"
+            style="background:linear-gradient(135deg, #10b981, #06b6d4); box-shadow:0 4px 16px rgba(16,185,129,0.35);">
+            <span class="btn-icon">✓</span>
+            <span class="btn-label">Register Patient Record</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- LOGOUT CONFIRMATION MODAL (Glassmorphic) -->
+  <div class="modal-backdrop" id="logoutModalBackdrop" onclick="handleLogoutBackdropClick(event)">
+    <div class="modal-card modal-confirm-card" id="logoutModal" role="dialog" aria-modal="true"
+      aria-labelledby="logoutModalTitle">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="modal-icon modal-icon-danger">⏻</div>
+          <div>
+            <h2 id="logoutModalTitle" class="modal-title">Confirm Sign Out</h2>
+            <p class="modal-desc">CarePlus Admin Portal</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="closeLogoutModal()" title="Close (Esc)">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding:22px 24px;">
+        <p class="logout-modal-text">
+          Are you sure you want to end your administrative session?
+        </p>
+        <p class="logout-modal-subtext">
+          You will be securely signed out of the CarePlus Master Admin Portal and redirected to the login screen.
+        </p>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-modal-cancel" onclick="closeLogoutModal()">Cancel</button>
+        <button type="button" class="btn-modal-logout" id="btnConfirmSignOut" onclick="confirmSignOut()">
+          <span class="btn-icon">⏻</span>
+          <span class="btn-label">Sign Out</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING ANIMATED TOAST BANNER (TOP) -->
+  <div id="topToastBanner" class="top-toast-banner" role="status" aria-live="polite">
+    <div class="toast-spinner"></div>
+    <span class="top-toast-icon">✓</span>
+    <span id="topToastText" class="top-toast-text">Logged out successfully. Redirecting...</span>
+  </div>
+
+  <!-- FLOATING TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="toast-container"></div>
+
+
+  <!-- ADMIT / ASSIGN ROOM MODAL (CarePlus Dark Glassmorphism) -->
+  <div class="modal-backdrop" id="admitPatientModalBackdrop" onclick="handleAdmitBackdropClick(event)">
+    <div class="modal-card" id="admitPatientModal" role="dialog" aria-modal="true" aria-labelledby="admitModalTitle"
+      style="max-width:540px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="modal-icon"
+            style="background:linear-gradient(135deg, rgba(56,189,248,0.2), rgba(99,102,241,0.2)); border:1px solid rgba(56,189,248,0.3); color:#38bdf8;">
+            🏥
+          </div>
+          <div>
+            <h2 id="admitModalTitle" class="modal-title">Admit / Assign Inpatient Bed</h2>
+            <p class="modal-desc">Assign room & bed for <span id="admitPatientNameDisplay"
+                style="color:#fff; font-weight:700;"></span></p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="closeAdmitModal()" title="Close (Esc)">✕</button>
+      </div>
+
+      <form id="admitPatientForm" onsubmit="handleAdmitPatientSubmit(event)">
+        <input type="hidden" id="admitPatientIdInput">
+        <div class="modal-body">
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="admitWardSelect">Ward / Room Type <span class="req">*</span></label>
+              <select id="admitWardSelect" class="form-control" onchange="loadAvailableRoomsForAdmit(this.value)"
+                required>
+                <option value="General Ward" selected>General Ward (₹1,000 / day)</option>
+                <option value="Semi-Private">Semi-Private (₹1,800 / day)</option>
+                <option value="Deluxe">Deluxe (₹2,500 / day)</option>
+                <option value="ICU">ICU (₹3,500 / day)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="admitDateInput">Admission Date <span class="req">*</span></label>
+              <input type="date" id="admitDateInput" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label for="admitRoomSelect">Available Room / Bed Number <span class="req">*</span></label>
+              <select id="admitRoomSelect" class="form-control" required>
+                <option value="">-- Choose Available Bed --</option>
+              </select>
+              <small class="form-hint" id="admitRoomHint"
+                style="display:block; margin-top:4px; font-size:11px; color:var(--text-muted);">
+                Occupied beds are filtered out in real-time.
+              </small>
+            </div>
+          </div>
+
+          <div id="admitModalAlert" class="modal-alert" style="display:none; margin-top:12px;"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-modal-cancel" onclick="closeAdmitModal()">Cancel</button>
+          <button type="submit" class="btn-modal-submit" id="btnSubmitAdmit"
+            style="background:linear-gradient(135deg, #0284c7, #6366f1); box-shadow:0 4px 16px rgba(2,132,199,0.35);">
+            <span class="btn-icon">✓</span>
+            <span class="btn-label">Confirm Inpatient Admission</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DISCHARGE PATIENT MODAL (CarePlus Dark Glassmorphism) -->
+  <div class="modal-backdrop" id="dischargePatientModalBackdrop" onclick="handleDischargeBackdropClick(event)">
+    <div class="modal-card" id="dischargePatientModal" role="dialog" aria-modal="true"
+      aria-labelledby="dischargeModalTitle" style="max-width:540px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="modal-icon"
+            style="background:linear-gradient(135deg, rgba(244,63,94,0.2), rgba(251,113,133,0.2)); border:1px solid rgba(244,63,94,0.3); color:#fb7185;">
+            🚪
+          </div>
+          <div>
+            <h2 id="dischargeModalTitle" class="modal-title">Discharge Patient &amp; Release Bed</h2>
+            <p class="modal-desc">Finalize discharge and make bed available for new admissions.</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="closeDischargeModal()" title="Close (Esc)">✕</button>
+      </div>
+
+      <form id="dischargePatientForm" onsubmit="handleDischargePatientSubmit(event)">
+        <input type="hidden" id="dischargePatientIdInput">
+        <div class="modal-body">
+          <!-- Discharge Summary Card -->
+          <div
+            style="background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:10px; padding:16px; margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
+              <span style="color:var(--text-dim); font-size:12px;">Patient:</span>
+              <strong id="dischargePatientName" style="color:#fff; font-size:13px;"></strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
+              <span style="color:var(--text-dim); font-size:12px;">Releasing Room / Bed:</span>
+              <span id="dischargeRoomBadge" class="badge-room" style="font-size:11px;"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
+              <span style="color:var(--text-dim); font-size:12px;">Admission Date:</span>
+              <span id="dischargeAdmDate" style="color:#fff; font-size:12px; font-weight:600;"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
+              <span style="color:var(--text-dim); font-size:12px;">Calculated Stay Length:</span>
+              <span id="dischargeDaysStay" style="color:#38bdf8; font-weight:700; font-size:12px;"></span>
+            </div>
+            <div
+              style="display:flex; justify-content:space-between; border-top:1px dashed var(--border-subtle); padding-top:10px; margin-top:8px; align-items:center;">
+              <span style="color:var(--text-dim); font-size:12px;">Est. Room Stay Charges:</span>
+              <span id="dischargeEstimatedCharges" style="color:#34d399; font-weight:800; font-size:15px;"></span>
+            </div>
+          </div>
+
+          <div class="form-group full-width">
+            <label for="dischargeDateInput">Discharge Date <span class="req">*</span></label>
+            <input type="date" id="dischargeDateInput" class="form-control" required
+              onchange="recalculateDischargeStay()">
+          </div>
+
+          <div
+            style="margin-top:12px; padding:10px 14px; background:rgba(244,63,94,0.08); border:1px solid rgba(244,63,94,0.22); border-radius:8px; color:#fca5a5; font-size:11.5px; line-height:1.45;">
+            ⚠️ <strong>Room Release Notice:</strong> Releasing this room makes it instantly available for other patient
+            admissions. Room charges will automatically appear in the <strong>Billing Desk</strong> upon invoicing.
+          </div>
+
+          <div id="dischargeModalAlert" class="modal-alert" style="display:none; margin-top:12px;"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-modal-cancel" onclick="closeDischargeModal()">Cancel</button>
+          <button type="submit" class="btn-modal-submit" id="btnSubmitDischarge"
+            style="background:linear-gradient(135deg, #e11d48, #f43f5e); box-shadow:0 4px 16px rgba(225,29,72,0.35);">
+            <span class="btn-icon">✓</span>
+            <span class="btn-label">Confirm Discharge &amp; Release Bed</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</body>
+
+</html>

@@ -63,3 +63,16 @@ typing-modules = ["frappe.types.DF"]
 quote-style = "double"
 indent-style = "tab"
 docstring-code-format = true
+
+[tool.pyright]
+typeCheckingMode = "off"
+extraPaths = [
+    "../frappe",
+    "../erpnext",
+    "../../env/lib/python3.14/site-packages",
+    "\\\\wsl.localhost\\Ubuntu-24.04\\home\\leeli\\frappe-bench-v16\\apps\\frappe",
+    "\\\\wsl.localhost\\Ubuntu-24.04\\home\\leeli\\frappe-bench-v16\\apps\\erpnext",
+    "\\\\wsl.localhost\\Ubuntu-24.04\\home\\leeli\\frappe-bench-v16\\env\\lib\\python3.14\\site-packages",
+]
+reportMissingImports = "none"
+reportMissingTypeStubs = false

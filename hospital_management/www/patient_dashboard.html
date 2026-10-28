@@ -1,10 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CarePlus | Patient Portal</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+      <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <script>
+    (function initSessionGuard() {
+        // 1. Immediate server-rendered session validation
+        const sessionUser = "{{ frappe.session.user }}";
+        if (!sessionUser || sessionUser === "Guest") {
+            window.history.replaceState(null, document.title, '/frontend');
+            window.location.replace('/frontend');
+            return;
+        }
+
+        // Replace current state so back navigation cannot freely reopen authenticated dashboard pages without valid credentials
+        window.history.replaceState(null, document.title, window.location.href);
+
+        // 2. Client-side session verification against backend API
+        async function checkAuthSession() {
+            try {
+                const res = await fetch('/api/method/hospital_management.api.check_session', {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    },
+                    cache: 'no-store'
+                });
+                if (!res.ok) {
+                    window.history.replaceState(null, document.title, '/frontend');
+                    window.location.replace('/frontend');
+                    return;
+                }
+                const data = await res.json();
+                const info = (data && data.message) ? data.message : data;
+                if (!info || info.status === 'unauthenticated' || !info.user || info.user === 'Guest') {
+                    window.history.replaceState(null, document.title, '/frontend');
+                    window.location.replace('/frontend');
+                }
+            } catch (err) {
+                console.warn('Session verification error:', err);
+            }
+        }
+        window.checkAuthSession = checkAuthSession;
+
+        // 3. Initial page load validation
+        checkAuthSession();
+
+        // 4. Prevent Browser Back-Forward Cache (bfcache)
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                // If restored from back-forward cache, verify active session
+                checkAuthSession();
+            }
+        });
+
+        // 5. Enforce history lock and validate on popstate (back navigation)
+        function lockNavigation() {
+            window.history.pushState(null, document.title, window.location.href);
+        }
+        lockNavigation();
+
+        window.addEventListener('popstate', function (event) {
+            checkAuthSession();
+            lockNavigation();
+        });
+
+        // 6. Trap Backspace on non-input elements
+        window.addEventListener('keydown', function (e) {
+            if (e.key === 'Backspace' || e.keyCode === 8) {
+                const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+                const isEditable = document.activeElement && (
+                    document.activeElement.isContentEditable ||
+                    tag === 'input' ||
+                    tag === 'textarea' ||
+                    tag === 'select'
+                );
+                if (!isEditable) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }
+        }, true);
+    })();
+  </script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --bg-base: #0b0f19;
@@ -203,16 +289,34 @@
             cursor: pointer;
             transition: all 0.2s;
         }
+
         .btn-receipt:hover {
             background: #38bdf8;
             color: #0b0f19;
         }
-        .badge-paid { background: rgba(16, 185, 129, 0.2) !important; color: #34d399 !important; }
-        .badge-unpaid { background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; }
-        .badge-partial { background: rgba(245, 158, 11, 0.2) !important; color: #fbbf24 !important; }
-        .badge-cancelled { background: rgba(148, 163, 184, 0.2) !important; color: #94a3b8 !important; }
-    
-        .btn-print-slip, .btn-prescription {
+
+        .badge-paid {
+            background: rgba(16, 185, 129, 0.2) !important;
+            color: #34d399 !important;
+        }
+
+        .badge-unpaid {
+            background: rgba(239, 68, 68, 0.2) !important;
+            color: #f87171 !important;
+        }
+
+        .badge-partial {
+            background: rgba(245, 158, 11, 0.2) !important;
+            color: #fbbf24 !important;
+        }
+
+        .badge-cancelled {
+            background: rgba(148, 163, 184, 0.2) !important;
+            color: #94a3b8 !important;
+        }
+
+        .btn-print-slip,
+        .btn-prescription {
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -230,17 +334,21 @@
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
             white-space: nowrap;
         }
-        .btn-print-slip:hover, .btn-prescription:hover {
+
+        .btn-print-slip:hover,
+        .btn-prescription:hover {
             background: #0369a1;
             border-color: #0369a1;
             color: #ffffff !important;
             box-shadow: 0 2px 4px rgba(2, 132, 199, 0.35);
             transform: translateY(-1px);
         }
-        .btn-print-slip:active, .btn-prescription:active {
+
+        .btn-print-slip:active,
+        .btn-prescription:active {
             transform: translateY(0);
         }
-    
+
         /* Time Slot Grid & Badges */
         .slot-spinner {
             display: inline-block;
@@ -251,8 +359,11 @@
             border-top-color: #38bdf8;
             animation: slot-spin 0.8s linear infinite;
         }
+
         @keyframes slot-spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .slot-grid {
@@ -285,6 +396,7 @@
             color: #34d399;
             cursor: pointer;
         }
+
         .slot-badge.available:hover {
             background: rgba(16, 185, 129, 0.25);
             border-color: #10b981;
@@ -309,17 +421,272 @@
             cursor: not-allowed;
             opacity: 0.65;
         }
+    
+    /* CAREPLUS REUSABLE NOTIFICATION / CONFIRMATION MODAL & TOAST SYSTEM */
+    .careplus-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 14, 26, 0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: cpFadeIn 0.25s ease-out;
+    }
+    @keyframes cpFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .careplus-modal-card {
+      position: relative;
+      background: linear-gradient(145deg, rgba(20, 27, 45, 0.95), rgba(13, 19, 33, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(99, 102, 241, 0.18);
+      border-radius: 20px;
+      width: min(440px, 94vw);
+      padding: 32px 28px 24px;
+      text-align: center;
+      overflow: hidden;
+      animation: cpScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes cpScaleUp {
+      from { transform: scale(0.92) translateY(12px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .careplus-modal-glow {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 220px;
+      height: 60px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .careplus-modal-header-icon {
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.25));
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+    }
+    .careplus-modal-header-icon.danger {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(225, 29, 72, 0.3));
+      border-color: rgba(244, 63, 94, 0.45);
+      box-shadow: 0 8px 24px rgba(244, 63, 94, 0.35);
+    }
+    .careplus-modal-header-icon.success {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.3));
+      border-color: rgba(16, 185, 129, 0.45);
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+    }
+    .careplus-modal-title {
+      font-size: 19px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin: 0 0 8px;
+      letter-spacing: -0.3px;
+    }
+    .careplus-modal-desc {
+      font-size: 14px;
+      color: #cbd5e1;
+      line-height: 1.55;
+      margin: 0 0 6px;
+    }
+    .careplus-modal-subtext {
+      font-size: 12.5px;
+      color: #94a3b8;
+      line-height: 1.45;
+      margin: 0 0 24px;
+    }
+    .careplus-modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .careplus-btn-cancel {
+      flex: 1;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 600;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .careplus-btn-cancel:hover {
+      background: rgba(51, 65, 85, 0.9);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .careplus-btn-confirm {
+      flex: 1;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+      transition: all 0.2s ease;
+    }
+    .careplus-btn-confirm:hover {
+      background: linear-gradient(135deg, #818cf8, #6366f1);
+      box-shadow: 0 6px 22px rgba(99, 102, 241, 0.6);
+      transform: translateY(-1px);
+    }
+    .careplus-btn-confirm.danger {
+      background: linear-gradient(135deg, #f43f5e, #e11d48);
+      box-shadow: 0 4px 16px rgba(244, 63, 94, 0.4);
+    }
+    .careplus-btn-confirm.danger:hover {
+      background: linear-gradient(135deg, #fb7185, #f43f5e);
+      box-shadow: 0 6px 22px rgba(244, 63, 94, 0.6);
+    }
+    .careplus-btn-confirm.success {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+    }
+    .careplus-btn-confirm.success:hover {
+      background: linear-gradient(135deg, #34d399, #10b981);
+      box-shadow: 0 6px 22px rgba(16, 185, 129, 0.6);
+    }
+
+    /* TOP-RIGHT FLOATING TOAST NOTIFICATIONS */
+    .careplus-toast-container {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 10001;
+      pointer-events: none;
+    }
+    .careplus-toast {
+      pointer-events: auto;
+      min-width: 300px;
+      max-width: 420px;
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(99, 102, 241, 0.15);
+      border-radius: 14px;
+      padding: 14px 18px;
+      color: #fff;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      animation: cpToastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.3s ease;
+    }
+    @keyframes cpToastSlideIn {
+      from { transform: translateX(40px) scale(0.95); opacity: 0; }
+      to { transform: translateX(0) scale(1); opacity: 1; }
+    }
+    .careplus-toast-icon {
+      font-size: 20px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .careplus-toast-body {
+      flex: 1;
+    }
+    .careplus-toast-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 2px;
+    }
+    .careplus-toast-msg {
+      font-size: 12.5px;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+    .careplus-toast.success {
+      border-color: rgba(16, 185, 129, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(16, 185, 129, 0.2);
+    }
+    .careplus-toast.success .careplus-toast-title { color: #34d399; }
+    .careplus-toast.warning {
+      border-color: rgba(245, 158, 11, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(245, 158, 11, 0.2);
+    }
+    .careplus-toast.warning .careplus-toast-title { color: #fbbf24; }
+    .careplus-toast.error {
+      border-color: rgba(244, 63, 94, 0.5);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(244, 63, 94, 0.2);
+    }
+    .careplus-toast.error .careplus-toast-title { color: #fda4af; }
+
     </style>
 </head>
+
 <body>
 
     <header class="header">
         <div class="brand-title">✚ CarePlus Patient Portal</div>
-        <div class="user-nav">
+                <div class="user-nav">
+            {% if is_admin %}
+            <a href="/admin_dashboard" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:rgba(16,185,129,0.15); border:1px solid #10b981; border-radius:6px; color:#34d399; font-weight:700; font-size:12px; text-decoration:none; margin-right:8px; transition:0.2s;" title="Return to Admin Master Portal">
+                ← Back to Admin Dashboard
+            </a>
+            <a href="/app" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:rgba(59,130,246,0.15); border:1px solid #3b82f6; border-radius:6px; color:#60a5fa; font-weight:600; font-size:12px; text-decoration:none; margin-right:8px;">
+                ⚙️ Frappe Desk
+            </a>
+            {% endif %}
             <div class="patient-tag">Patient: <span id="loggedPatientName">Loading...</span></div>
             <button class="btn-logout" onclick="confirmAndLogout()">Logout</button>
         </div>
     </header>
+
+        <!-- Patient Profile Summary Banner -->
+    <div class="card" id="patientProfileBanner" style="margin-bottom:24px; padding:20px 24px; background:linear-gradient(135deg, rgba(31, 41, 61, 0.85), rgba(17, 24, 39, 0.95)); border:1px solid rgba(56, 189, 248, 0.25); box-shadow:0 8px 24px rgba(0,0,0,0.35);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+            <div style="display:flex; align-items:center; gap:16px;">
+                <div style="width:52px; height:52px; border-radius:12px; background:linear-gradient(135deg, #0284c7, #2563eb); display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:0 4px 14px rgba(2, 132, 199, 0.4);">
+                    🧑
+                </div>
+                <div>
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <h1 id="profilePatientName" style="font-size:22px; font-weight:700; color:#fff; margin:0;">Loading Patient...</h1>
+                        <span id="profilePatientId" class="badge-status" style="background:rgba(56, 189, 248, 0.15); color:#38bdf8; border:1px solid rgba(56, 189, 248, 0.3); font-family:monospace; font-size:12px;">—</span>
+                        <span id="profileStatusBadge" class="badge-status badge-paid">Active</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:16px; margin-top:8px; flex-wrap:wrap; font-size:13px; color:var(--text-muted);">
+                        <span><strong style="color:var(--text-main);">Gender:</strong> <span id="profileGender">—</span></span>
+                        <span>&bull;</span>
+                        <span><strong style="color:var(--text-main);">Blood Group:</strong> <span id="profileBloodGroup" style="font-weight:700; color:#f43f5e; background:rgba(244,63,94,0.12); padding:2px 8px; border-radius:4px; border:1px solid rgba(244,63,94,0.25);">—</span></span>
+                        <span>&bull;</span>
+                        <span><strong style="color:var(--text-main);">DOB:</strong> <span id="profileDob">—</span></span>
+                        <span>&bull;</span>
+                        <span><strong style="color:var(--text-main);">Phone:</strong> <span id="profilePhone">—</span></span>
+                        <span>&bull;</span>
+                        <span><strong style="color:var(--text-main);">Email:</strong> <span id="profileEmail">—</span></span>
+                    </div>
+                </div>
+            </div>
+            <div id="adminViewingBadge" style="display:none; align-items:center; gap:8px; background:rgba(16, 185, 129, 0.15); border:1px solid rgba(16, 185, 129, 0.35); padding:8px 14px; border-radius:8px; color:#34d399; font-size:12px; font-weight:600;">
+                <span>🛡️</span> Viewing via Admin Master Portal
+            </div>
+        </div>
+    </div>
 
     <div class="dashboard-grid">
         <aside class="sidebar-booking">
@@ -331,35 +698,47 @@
                         <select id="doctorSelect" class="form-control" onchange="handleDoctorOrDateChange()" required>
                             <option value="">-- Choose Doctor --</option>
                             {% if doctors %}
-                                {% for doc in doctors %}
-                                    <option value="{{ doc.name }}">{{ doc.doctor_name or doc.name }}{% if doc.department %} ({{ doc.department }}){% endif %}</option>
-                                {% endfor %}
+                            {% for doc in doctors %}
+                            <option value="{{ doc.name }}" data-active="{{ 1 if doc.is_active else 0 }}">{{ doc.doctor_name or doc.name }}{% if doc.specialization or doc.department %} ({{ doc.specialization or doc.department }}){% endif %}{% if not doc.is_active %} - [On Leave / Not Available]{% endif %}</option>
+                            {% endfor %}
                             {% endif %}
                         </select>
+                        <!-- Inactive Doctor Warning Banner -->
+                        <div id="doctorUnavailableWarning" style="display:none; margin-top:8px; padding:10px 14px; background:rgba(239, 68, 68, 0.15); border:1px solid rgba(239, 68, 68, 0.35); border-radius:8px; color:#fca5a5; font-size:12px; font-weight:600; align-items:center; gap:8px;">
+                            <span style="font-size:16px;">⚠️</span>
+                            <span>This doctor is currently on leave / not available for booking today. Please choose another doctor.</span>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Date *</label>
-                        <input type="date" id="appointmentDate" class="form-control" onchange="handleDoctorOrDateChange()" required>
+                        <input type="date" id="appointmentDate" class="form-control"
+                            onchange="handleDoctorOrDateChange()" required>
                     </div>
 
                     <!-- Dynamic Interactive Slot Grid -->
                     <div class="form-group" id="slotPickerSection">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <label style="margin-bottom:0; font-weight:600; font-size:12.5px;">Available Time Slots *</label>
-                            <span id="slotHelperStatus" style="font-size:11px; color:var(--text-muted);">Pick doctor & date</span>
+                        <div
+                            style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label style="margin-bottom:0; font-weight:600; font-size:12.5px;">Available Time Slots
+                                *</label>
+                            <span id="slotHelperStatus" style="font-size:11px; color:var(--text-muted);">Pick doctor &
+                                date</span>
                         </div>
                         <input type="hidden" id="appointmentTime" name="appointment_time" value="" required>
 
-                        <div id="slotsContainer" style="min-height:92px; background:#0b1120; border:1px solid var(--border); border-radius:8px; padding:10px; transition:border-color 0.2s;">
+                        <div id="slotsContainer"
+                            style="min-height:92px; background:#0b1120; border:1px solid var(--border); border-radius:8px; padding:10px; transition:border-color 0.2s;">
                             <!-- Placeholder -->
-                            <div id="slotsPlaceholder" style="text-align:center; padding:16px 8px; color:var(--text-muted); font-size:12px;">
+                            <div id="slotsPlaceholder"
+                                style="text-align:center; padding:16px 8px; color:var(--text-muted); font-size:12px;">
                                 📅 Choose a Doctor and Date above to view live available slots.
                             </div>
 
                             <!-- Loading Spinner -->
                             <div id="slotsSpinner" style="display:none; text-align:center; padding:18px 8px;">
                                 <div class="slot-spinner"></div>
-                                <div style="font-size:11.5px; color:var(--primary, #38bdf8); margin-top:6px; font-weight:500;">
+                                <div
+                                    style="font-size:11.5px; color:var(--primary, #38bdf8); margin-top:6px; font-weight:500;">
                                     Loading schedule & slots...
                                 </div>
                             </div>
@@ -368,19 +747,28 @@
                             <div id="slotsGrid" class="slot-grid" style="display:none;"></div>
 
                             <!-- Notice / Alert Box -->
-                            <div id="slotsNotice" style="display:none; text-align:center; padding:12px; font-size:12px; border-radius:6px; margin-top:4px;"></div>
+                            <div id="slotsNotice"
+                                style="display:none; text-align:center; padding:12px; font-size:12px; border-radius:6px; margin-top:4px;">
+                            </div>
                         </div>
 
                         <!-- Legend -->
-                        <div id="slotsLegend" style="display:none; justify-content:space-between; margin-top:6px; font-size:10.5px; color:var(--text-muted); padding:0 4px;">
+                        <div id="slotsLegend"
+                            style="display:none; justify-content:space-between; margin-top:6px; font-size:10.5px; color:var(--text-muted); padding:0 4px;">
                             <span style="display:inline-flex; align-items:center; gap:4px;">
-                                <span style="width:8px; height:8px; border-radius:2px; background:#10b981; display:inline-block;"></span> Available
+                                <span
+                                    style="width:8px; height:8px; border-radius:2px; background:#10b981; display:inline-block;"></span>
+                                Available
                             </span>
                             <span style="display:inline-flex; align-items:center; gap:4px;">
-                                <span style="width:8px; height:8px; border-radius:2px; background:#0284c7; display:inline-block;"></span> Selected
+                                <span
+                                    style="width:8px; height:8px; border-radius:2px; background:#0284c7; display:inline-block;"></span>
+                                Selected
                             </span>
                             <span style="display:inline-flex; align-items:center; gap:4px;">
-                                <span style="width:8px; height:8px; border-radius:2px; background:#64748b; display:inline-block;"></span> Booked / Past
+                                <span
+                                    style="width:8px; height:8px; border-radius:2px; background:#64748b; display:inline-block;"></span>
+                                Booked / Past
                             </span>
                         </div>
                     </div>
@@ -391,7 +779,8 @@
                     </div>
                     <div class="form-group">
                         <label>Reason for Visit</label>
-                        <textarea id="reasonVisit" class="form-control" rows="3" placeholder="Fever, Routine checkup, etc."></textarea>
+                        <textarea id="reasonVisit" class="form-control" rows="3"
+                            placeholder="Fever, Routine checkup, etc."></textarea>
                     </div>
                     <button type="submit" class="btn-submit" id="bookSubmitBtn">Confirm Booking</button>
                 </form>
@@ -421,7 +810,8 @@
             </div>
 
             <div class="card" id="patientVitalsCard">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
                     <h2 class="card-title" style="margin-bottom:0;">💓 Your Health Vitals & Blood Sugar</h2>
                     <span id="vitalsLastRecorded" style="font-size:12px; color:var(--text-muted);">Recorded: —</span>
                 </div>
@@ -454,7 +844,9 @@
             <div class="card" style="margin-top:24px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                     <h2 class="card-title" style="margin-bottom:0;">Your Invoices & Medical Bills</h2>
-                    <a href="/billing" style="font-size:12px; color:var(--primary, #38bdf8); text-decoration:none; font-weight:600;">Open Billing Portal ↗</a>
+                    <a href="/billing"
+                        style="font-size:12px; color:var(--primary, #38bdf8); text-decoration:none; font-weight:600;">Open
+                        Billing Portal ↗</a>
                 </div>
                 <div class="table-responsive">
                     <table>
@@ -479,47 +871,142 @@
         </main>
     </div>
 
+
+
     <script>
+
         // ─────────────────────────────────────────────
-        // 1. Permanent Back & Backspace Trap
+
         // ─────────────────────────────────────────────
-        function lockHistory() {
-            window.history.pushState({ page: "dashboard" }, "", window.location.href);
+        // CarePlus Modal & Toast Notification System
+        // ─────────────────────────────────────────────
+        let _careplusConfirmResolver = null;
+
+        function showCarePlusConfirm({
+            title = "Confirm Action",
+            message = "Are you sure you want to proceed?",
+            subtext = "",
+            icon = "🔔",
+            confirmText = "Confirm",
+            cancelText = "Cancel",
+            type = "primary"
+        } = {}) {
+            return new Promise((resolve) => {
+                _careplusConfirmResolver = resolve;
+
+                const modal = document.getElementById("careplusConfirmModalBackdrop");
+                const iconEl = document.getElementById("careplusModalIcon");
+                const titleEl = document.getElementById("careplusModalTitle");
+                const descEl = document.getElementById("careplusModalDesc");
+                const subtextEl = document.getElementById("careplusModalSubtext");
+                const confirmBtn = document.getElementById("careplusModalConfirmBtn");
+                const cancelBtn = document.getElementById("careplusModalCancelBtn");
+
+                if (iconEl) {
+                    iconEl.textContent = icon;
+                    iconEl.className = "careplus-modal-header-icon " + (type === 'danger' ? 'danger' : (type === 'success' ? 'success' : ''));
+                }
+                if (titleEl) titleEl.textContent = title;
+                if (descEl) descEl.innerHTML = message;
+                if (subtextEl) {
+                    subtextEl.textContent = subtext;
+                    subtextEl.style.display = subtext ? "block" : "none";
+                }
+                if (confirmBtn) {
+                    confirmBtn.textContent = confirmText;
+                    confirmBtn.className = "careplus-btn-confirm " + (type === 'danger' ? 'danger' : (type === 'success' ? 'success' : ''));
+                }
+                if (cancelBtn) {
+                    cancelBtn.textContent = cancelText;
+                    cancelBtn.style.display = cancelText ? "inline-block" : "none";
+                }
+
+                if (modal) modal.style.display = "flex";
+            });
         }
-        lockHistory();
+        window.showCarePlusConfirm = showCarePlusConfirm;
 
-        window.addEventListener("popstate", function () {
-            lockHistory();
-            setTimeout(() => {
-                const confirmExit = confirm("Are you sure you want to log out?");
-                if (confirmExit) {
-                    executeLogout();
-                }
-            }, 50);
-        });
-
-        document.addEventListener("keydown", function (e) {
-            if (e.key === "Backspace" || e.keyCode === 8) {
-                const target = document.activeElement;
-                const isField = target && (
-                    target.tagName === "INPUT" || 
-                    target.tagName === "TEXTAREA" || 
-                    target.isContentEditable
-                );
-                if (!isField) {
-                    e.preventDefault();
-                    if (confirm("Are you sure you want to log out?")) {
-                        executeLogout();
-                    }
-                }
+        function resolveCareplusConfirm(val) {
+            const modal = document.getElementById("careplusConfirmModalBackdrop");
+            if (modal) modal.style.display = "none";
+            if (_careplusConfirmResolver) {
+                _careplusConfirmResolver(val);
+                _careplusConfirmResolver = null;
             }
-        });
+        }
+        window.resolveCareplusConfirm = resolveCareplusConfirm;
 
-        // ─────────────────────────────────────────────
+        function handleCareplusModalBackdrop(e) {
+            if (e.target && e.target.id === "careplusConfirmModalBackdrop") {
+                resolveCareplusConfirm(false);
+            }
+        }
+        window.handleCareplusModalBackdrop = handleCareplusModalBackdrop;
+
+        function showCarePlusToast(message, type = "success", title = "") {
+            let container = document.getElementById("careplusToastContainer");
+            if (!container) {
+                container = document.createElement("div");
+                container.id = "careplusToastContainer";
+                container.className = "careplus-toast-container";
+                document.body.appendChild(container);
+            }
+
+            const defaultTitles = {
+                success: "Success",
+                warning: "Attention",
+                error: "Alert",
+                info: "Notice"
+            };
+            const icons = {
+                success: "✓",
+                warning: "⚠️",
+                error: "✕",
+                info: "ℹ️"
+            };
+
+            const toastTitle = title || defaultTitles[type] || "Notification";
+            const icon = icons[type] || "🔔";
+
+            const t = document.createElement("div");
+            t.className = `careplus-toast ${type}`;
+            t.innerHTML = `
+                <div class="careplus-toast-icon">${icon}</div>
+                <div class="careplus-toast-body">
+                    <div class="careplus-toast-title">${escapeHtml(toastTitle)}</div>
+                    <div class="careplus-toast-msg">${message}</div>
+                </div>
+            `;
+            container.appendChild(t);
+
+            setTimeout(() => {
+                t.style.opacity = "0";
+                t.style.transform = "translateX(30px) scale(0.95)";
+                setTimeout(() => t.remove(), 300);
+            }, 3000);
+        }
+        window.showCarePlusToast = showCarePlusToast;
+        window.showToast = showCarePlusToast;
+
+        // Override window.alert to completely prevent default browser alert dialogs
+        window.alert = function(msg) {
+            showCarePlusToast(typeof msg === "object" ? JSON.stringify(msg) : String(msg), "warning", "Notice");
+        };
+
         // 2. Logout Handlers
         // ─────────────────────────────────────────────
-        function confirmAndLogout() {
-            if (confirm("Are you sure you want to log out?")) {
+        async function confirmAndLogout() {
+            const confirmed = await showCarePlusConfirm({
+                title: "Confirm Sign Out",
+                message: "Are you sure you want to end your active patient session?",
+                subtext: "You will be securely signed out and returned to the CarePlus sign in page.",
+                icon: "⏻",
+                confirmText: "Sign Out",
+                cancelText: "Cancel",
+                type: "danger"
+            });
+            if (confirmed) {
+                showCarePlusToast("Logged out successfully. Redirecting...", "success", "Signed Out");
                 executeLogout();
             }
         }
@@ -530,8 +1017,11 @@
             } catch (err) {
                 console.error("Logout request error:", err);
             }
+            window.history.replaceState(null, document.title, "/frontend");
             window.location.replace("/frontend");
         }
+        window.confirmAndLogout = confirmAndLogout;
+        window.executeLogout = executeLogout;
 
         // ─────────────────────────────────────────────
         // 3. Load Doctors List (Server + API Fallback)
@@ -547,13 +1037,16 @@
                 const res = await fetch("/api/method/hospital_management.api.get_doctors_list");
                 const result = await res.json();
                 const doctors = result.message || [];
-                
+
                 sel.innerHTML = '<option value="">-- Choose Doctor --</option>';
                 doctors.forEach(doc => {
                     const opt = document.createElement("option");
                     opt.value = doc.name;
-                    const info = doc.specialization ? ` (${doc.specialization})` : '';
-                    opt.textContent = (doc.doctor_name || doc.name) + info;
+                    const info = (doc.specialization || doc.department) ? ` (${doc.specialization || doc.department})` : '';
+                    const isInactive = (doc.is_active === 0 || doc.is_active === false || doc.is_active === "0");
+                    const leaveTag = isInactive ? ' - [On Leave / Not Available]' : '';
+                    opt.textContent = (doc.doctor_name || doc.name) + info + leaveTag;
+                    opt.setAttribute("data-active", isInactive ? "0" : "1");
                     sel.appendChild(opt);
                 });
             } catch (err) {
@@ -566,12 +1059,19 @@
         // ─────────────────────────────────────────────
         async function loadPatientDashboard() {
             try {
-                const res = await fetch("/api/method/hospital_management.api.get_patient_dashboard_data");
+                const urlParams = new URLSearchParams(window.location.search);
+                const patientParam = urlParams.get("patient");
+                let apiUrl = "/api/method/hospital_management.api.get_patient_dashboard_data";
+                if (patientParam) {
+                    apiUrl += `?patient=${encodeURIComponent(patientParam)}`;
+                }
+
+                const res = await fetch(apiUrl);
                 const result = await res.json();
                 const data = result.message;
 
                 if (!data || data.status === "not_found") {
-                    alert("No patient profile linked with this login account.");
+                    showCarePlusToast(data?.message || "No patient profile linked with this login account.", "error");
                     window.location.replace("/frontend");
                     return;
                 }
@@ -581,9 +1081,35 @@
                     window.dashboardInvoices = data.invoices;
                 }
 
-                document.getElementById("loggedPatientName").textContent = data.patient.patient_name || data.patient.name;
-                if (data.patient.phone) {
-                    document.getElementById("contactPhone").value = data.patient.phone;
+                const p = data.patient;
+                document.getElementById("loggedPatientName").textContent = p.patient_name || p.name;
+                const pNameEl = document.getElementById("profilePatientName");
+                if (pNameEl) pNameEl.textContent = p.patient_name || p.name;
+                const pIdEl = document.getElementById("profilePatientId");
+                if (pIdEl) pIdEl.textContent = p.name;
+                const pGenEl = document.getElementById("profileGender");
+                if (pGenEl) pGenEl.textContent = p.gender || "—";
+                const pBldEl = document.getElementById("profileBloodGroup");
+                if (pBldEl) pBldEl.textContent = p.blood_group || "—";
+                const pDobEl = document.getElementById("profileDob");
+                if (pDobEl) pDobEl.textContent = p.date_of_birth || "—";
+                const pPhoneEl = document.getElementById("profilePhone");
+                if (pPhoneEl) pPhoneEl.textContent = p.phone || "—";
+                const pMailEl = document.getElementById("profileEmail");
+                if (pMailEl) pMailEl.textContent = p.email || "—";
+                const pStatEl = document.getElementById("profileStatusBadge");
+                if (pStatEl) {
+                    pStatEl.textContent = p.status || "Active";
+                    pStatEl.className = `badge-status ${p.status === 'Active' ? 'badge-paid' : 'badge-unpaid'}`;
+                }
+
+                const adminBadge = document.getElementById("adminViewingBadge");
+                if (adminBadge && patientParam) {
+                    adminBadge.style.display = "flex";
+                }
+
+                if (p.phone) {
+                    document.getElementById("contactPhone").value = p.phone;
                 }
 
                 const apptBody = document.getElementById("appointmentsTableBody");
@@ -591,7 +1117,7 @@
                     apptBody.innerHTML = data.appointments.map(a => `
                         <tr>
                             <td><strong>${escapeHtml(a.doctor || "—")}</strong></td>
-                            <td>${a.appointment_date || "—"} &nbsp;|&nbsp; ${a.appointment_time ? (a.appointment_time.length >= 8 ? a.appointment_time.slice(0,5) : a.appointment_time.slice(0,4)) : ""}</td>
+                            <td>${a.appointment_date || "—"} &nbsp;|&nbsp; ${a.appointment_time ? (a.appointment_time.length >= 8 ? a.appointment_time.slice(0, 5) : a.appointment_time.slice(0, 4)) : ""}</td>
                             <td><span class="badge-status">${a.status || "Scheduled"}</span></td>
                             <td>${escapeHtml(a.reason_for_visit || "—")}</td>
                         </tr>
@@ -621,7 +1147,8 @@
                 }
 
                 // Render patient health vitals & blood sugar
-                renderPatientVitals(data.latest_vitals);
+                const latestV = data.latest_vitals || (data.vitals && data.vitals.length > 0 ? data.vitals[0] : null);
+                renderPatientVitals(latestV);
 
                 // Fetch invoices for this logged in patient
                 await loadPatientInvoices(data.patient.name || data.patient.email);
@@ -990,18 +1517,51 @@
         }
 
         async function handleDoctorOrDateChange() {
-            const doc = document.getElementById("doctorSelect").value;
+            const sel = document.getElementById("doctorSelect");
+            const doc = sel.value;
             const date = document.getElementById("appointmentDate").value;
+            const selectedOpt = sel.options[sel.selectedIndex];
+            const isInactive = selectedOpt && selectedOpt.getAttribute("data-active") === "0";
+            const warningEl = document.getElementById("doctorUnavailableWarning");
+            const submitBtn = document.getElementById("bookSubmitBtn");
+            const slotsContainer = document.getElementById("slotsContainer");
 
             // Clear previously selected slot
             selectedSlotTime = "";
             document.getElementById("appointmentTime").value = "";
             const statusEl = document.getElementById("slotHelperStatus");
-            statusEl.textContent = "Select a slot";
-            statusEl.style.color = "var(--text-muted)";
+
+            if (isInactive) {
+                if (warningEl) warningEl.style.display = "flex";
+                if (submitBtn) submitBtn.disabled = true;
+                if (statusEl) {
+                    statusEl.textContent = "Doctor on leave";
+                    statusEl.style.color = "#ef4444";
+                }
+                const placeholder = document.getElementById("slotsPlaceholder");
+                if (placeholder) {
+                    placeholder.style.display = "block";
+                    placeholder.innerHTML = '<span style="color:#f87171; font-weight:600;">⚠️ Selected doctor is currently on leave. Booking unavailable.</span>';
+                }
+                document.getElementById("slotsSpinner").style.display = "none";
+                document.getElementById("slotsGrid").style.display = "none";
+                document.getElementById("slotsNotice").style.display = "none";
+                document.getElementById("slotsLegend").style.display = "none";
+                if (slotsContainer) slotsContainer.style.borderColor = "rgba(239, 68, 68, 0.4)";
+                return;
+            } else {
+                if (warningEl) warningEl.style.display = "none";
+                if (submitBtn) submitBtn.disabled = false;
+                if (slotsContainer) slotsContainer.style.borderColor = "var(--border)";
+                if (statusEl) {
+                    statusEl.textContent = "Select a slot";
+                    statusEl.style.color = "var(--text-muted)";
+                }
+            }
 
             if (!doc || !date) {
                 document.getElementById("slotsPlaceholder").style.display = "block";
+                document.getElementById("slotsPlaceholder").textContent = "Pick doctor and date to view live slots";
                 document.getElementById("slotsSpinner").style.display = "none";
                 document.getElementById("slotsGrid").style.display = "none";
                 document.getElementById("slotsNotice").style.display = "none";
@@ -1129,22 +1689,33 @@
         async function handleAppointmentBooking(e) {
             e.preventDefault();
 
-            const doctorVal = document.getElementById("doctorSelect").value;
+            const sel = document.getElementById("doctorSelect");
+            const doctorVal = sel.value;
             const dateVal = document.getElementById("appointmentDate").value;
             const timeVal = document.getElementById("appointmentTime").value;
 
             if (!doctorVal) {
-                alert("Please choose a Doctor.");
-                document.getElementById("doctorSelect").focus();
+                showCarePlusToast("Please choose a Doctor.", "warning");
+                sel.focus();
+                return;
+            }
+
+            const selectedOpt = sel.options[sel.selectedIndex];
+            if (selectedOpt && selectedOpt.getAttribute("data-active") === "0") {
+                showCarePlusToast("This doctor is currently on leave / not available for booking today. Please choose another doctor.", "warning");
+                const warningEl = document.getElementById("doctorUnavailableWarning");
+                if (warningEl) warningEl.style.display = "flex";
+                const submitBtn = document.getElementById("bookSubmitBtn");
+                if (submitBtn) submitBtn.disabled = true;
                 return;
             }
             if (!dateVal) {
-                alert("Please select an Appointment Date.");
+                showCarePlusToast("Please select an Appointment Date.", "warning");
                 document.getElementById("appointmentDate").focus();
                 return;
             }
             if (!timeVal) {
-                alert("Please select an available Time Slot from the grid.");
+                showCarePlusToast("Please select an available Time Slot from the grid.", "warning");
                 const container = document.getElementById("slotsContainer");
                 container.style.borderColor = "#ef4444";
                 container.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1160,7 +1731,8 @@
                 appointment_date: dateVal,
                 appointment_time: timeVal,
                 reason_for_visit: document.getElementById("reasonVisit").value,
-                phone_number: document.getElementById("contactPhone").value
+                phone_number: document.getElementById("contactPhone").value,
+                patient: (window.currentPatient && window.currentPatient.name) || undefined
             };
 
             try {
@@ -1175,29 +1747,29 @@
 
                 const res = await response.json();
                 if (res.message && res.message.status === "success") {
-                    alert("Appointment booked successfully! ID: " + res.message.appointment + " (" + (res.message.time || timeVal) + ")");
+                    showCarePlusToast("Appointment booked successfully! ID: " + res.message.appointment + " (" + (res.message.time || timeVal) + ")", "success", "Booking Confirmed");
                     document.getElementById("reasonVisit").value = "";
                     document.getElementById("appointmentTime").value = "";
-                    
+
                     // Refresh slots and patient dashboard
                     await fetchAvailableSlots(doctorVal, dateVal);
                     await loadPatientDashboard();
-        setTimeout(handleDoctorOrDateChange, 300);
+                    setTimeout(handleDoctorOrDateChange, 300);
                 } else {
                     let errMsg = res.message || "";
                     if (res._server_messages) {
                         try {
                             const parsed = JSON.parse(res._server_messages);
                             errMsg = parsed.map(m => JSON.parse(m).message).join("\n");
-                        } catch(e) {}
+                        } catch (e) { }
                     }
-                    alert(errMsg || "This time slot has just been booked by another patient. Please choose another slot.");
+                    showCarePlusToast(errMsg || "This time slot has just been booked by another patient. Please choose another slot.", "error", "Booking Conflict");
                     // Refresh slots immediately to reflect conflict
                     await fetchAvailableSlots(doctorVal, dateVal);
                 }
             } catch (err) {
                 console.error("Booking error:", err);
-                alert("Server error occurred while booking. Please try again.");
+                showCarePlusToast("Server error occurred while booking. Please try again.", "error");
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = "Confirm Booking";
@@ -1214,23 +1786,52 @@
         setTimeout(handleDoctorOrDateChange, 300);
     </script>
     <!-- Patient Receipt Modal -->
-    <div class="modal-backdrop" id="patientReceiptModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); z-index:1000; align-items:center; justify-content:center; padding:16px;">
-        <div style="background:#111827; border:1px solid #2e3a52; border-radius:12px; width:100%; max-width:640px; max-height:90vh; overflow-y:auto; padding:24px; position:relative; box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid #2e3a52; padding-bottom:16px; margin-bottom:20px;">
+    <div class="modal-backdrop" id="patientReceiptModal"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); z-index:1000; align-items:center; justify-content:center; padding:16px;">
+        <div
+            style="background:#111827; border:1px solid #2e3a52; border-radius:12px; width:100%; max-width:640px; max-height:90vh; overflow-y:auto; padding:24px; position:relative; box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);">
+            <div
+                style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid #2e3a52; padding-bottom:16px; margin-bottom:20px;">
                 <div>
-                    <h3 style="color:#38bdf8; font-size:18px; font-weight:700;">🏥 CarePlus Multispeciality Hospital</h3>
+                    <h3 style="color:#38bdf8; font-size:18px; font-weight:700;">🏥 CarePlus Multispeciality Hospital
+                    </h3>
                     <p style="color:#94a3b8; font-size:12px; margin-top:2px;">Official Medical Receipt & Tax Invoice</p>
                 </div>
-                <button onclick="closePatientReceipt()" style="background:transparent; border:none; color:#94a3b8; font-size:24px; cursor:pointer; line-height:1;">&times;</button>
+                <button onclick="closePatientReceipt()"
+                    style="background:transparent; border:none; color:#94a3b8; font-size:24px; cursor:pointer; line-height:1;">&times;</button>
             </div>
             <div id="patientReceiptModalBody">
                 <div style="text-align:center; padding:30px; color:#94a3b8;">Loading receipt details...</div>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px; border-top:1px solid #2e3a52; padding-top:16px;">
-                <button onclick="printPatientReceipt()" style="background:#0284c7; color:#fff; border:none; padding:8px 18px; border-radius:6px; font-weight:600; cursor:pointer;">🖨️ Print Receipt</button>
-                <button onclick="closePatientReceipt()" style="background:#1f293d; color:#94a3b8; border:1px solid #2e3a52; padding:8px 18px; border-radius:6px; font-weight:600; cursor:pointer;">Close</button>
+            <div
+                style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px; border-top:1px solid #2e3a52; padding-top:16px;">
+                <button onclick="printPatientReceipt()"
+                    style="background:#0284c7; color:#fff; border:none; padding:8px 18px; border-radius:6px; font-weight:600; cursor:pointer;">🖨️
+                    Print Receipt</button>
+                <button onclick="closePatientReceipt()"
+                    style="background:#1f293d; color:#94a3b8; border:1px solid #2e3a52; padding:8px 18px; border-radius:6px; font-weight:600; cursor:pointer;">Close</button>
             </div>
         </div>
     </div>
+
+<!-- CAREPLUS REUSABLE NOTIFICATION / CONFIRMATION MODAL -->
+<div class="careplus-modal-backdrop" id="careplusConfirmModalBackdrop" style="display:none;" onclick="handleCareplusModalBackdrop(event)">
+  <div class="careplus-modal-card" id="careplusConfirmModalCard" role="dialog" aria-modal="true">
+    <div class="careplus-modal-glow"></div>
+    <div class="careplus-modal-header-icon" id="careplusModalIcon">🔔</div>
+    <h3 class="careplus-modal-title" id="careplusModalTitle">Confirmation</h3>
+    <p class="careplus-modal-desc" id="careplusModalDesc">Are you sure you want to proceed?</p>
+    <p class="careplus-modal-subtext" id="careplusModalSubtext"></p>
+    <div class="careplus-modal-actions">
+      <button type="button" class="careplus-btn-cancel" id="careplusModalCancelBtn" onclick="resolveCareplusConfirm(false)">Cancel</button>
+      <button type="button" class="careplus-btn-confirm" id="careplusModalConfirmBtn" onclick="resolveCareplusConfirm(true)">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- CAREPLUS TOP-RIGHT FLOATING TOAST CONTAINER -->
+<div id="careplusToastContainer" class="careplus-toast-container" role="status" aria-live="polite"></div>
+
 </body>
+
 </html>
